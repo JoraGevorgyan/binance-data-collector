@@ -2,7 +2,7 @@ add_compile_definitions(
     APP_NAME="${APP_NAME}"
 )
 
-include(../../sources.cmake)
+include(../sources.cmake)
 
 add_executable(${EXECUTABLE_NAME} ${SOURCES} ${HEADERS} ${RESOURCES})
 
