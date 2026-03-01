@@ -22,8 +22,8 @@
             "inherits": "base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "RUN_CLANG_TIDY": "OFF",
-                "RUN_CLANG_FORMAT": "OFF",
+                "RUN_CLANG_TIDY": "ON",
+                "CONFIGURE_CLANG_FORMAT": "ON",
                 "RUN_TESTS": "OFF"
             }
         },

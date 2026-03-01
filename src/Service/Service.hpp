@@ -1,18 +1,16 @@
 #pragma once
 #include "Service/ServiceBase.hpp"
 
-namespace Service
-{
+namespace Service {
 
-enum Status
-{
-    STOPPED = 1,
-    STOPPING,
-    RUNNING,
-    STARTING,
-    RESUMING,
-    PAUSING,
-    PAUSED
+enum Status {
+	STOPPED = 1,
+	STOPPING,
+	RUNNING,
+	STARTING,
+	RESUMING,
+	PAUSING,
+	PAUSED
 };
 
 bool runService(ServiceBase& service);

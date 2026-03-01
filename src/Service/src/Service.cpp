@@ -1,21 +1,18 @@
 #include "../Service.hpp"
 #include "spdlog/spdlog.h"
 
-namespace Service
-{
+namespace Service {
 
-namespace
-{
+namespace {
 
-class Service final
-{
-public:
+class Service final {
+   public:
 	explicit Service(ServiceBase& service);
 
-    Service(Service& other) = delete;
-    void operator=(Service& other) = delete;
+	Service(Service& other) = delete;
+	void operator=(Service& other) = delete;
 
-    static std::unique_ptr<Service>& createInstance(ServiceBase& service);
+	static std::unique_ptr<Service>& createInstance(ServiceBase& service);
 	static std::unique_ptr<Service>& getInstance();
 
 	void start();
@@ -27,21 +24,19 @@ public:
 	static void signalTerm(int signal);
 	static void signalHandler(int signal);
 
-private:
+   private:
 	static std::unique_ptr<Service> m_instance;
 	ServiceBase& m_service;
 	Status m_status;
 };
 
 Service::Service(ServiceBase& service)
-	: m_service(service), m_status(Status::STOPPED) {}
+    : m_service(service), m_status(Status::STOPPED) {}
 
 std::unique_ptr<Service> Service::m_instance{nullptr};
 
-std::unique_ptr<Service>& Service::createInstance(ServiceBase& service)
-{
-	if (m_instance != nullptr)
-	{
+std::unique_ptr<Service>& Service::createInstance(ServiceBase& service) {
+	if (m_instance != nullptr) {
 		spdlog::debug("returning existing instance of Service");
 		return m_instance;
 	}
@@ -50,30 +45,25 @@ std::unique_ptr<Service>& Service::createInstance(ServiceBase& service)
 	return m_instance;
 }
 
-std::unique_ptr<Service>& Service::getInstance()
-{
+std::unique_ptr<Service>& Service::getInstance() {
 	return m_instance;
 }
 
-} // namespace for Service final class(unnamed)
+} // namespace
 
-bool runService(ServiceBase& service)
-{
-   return debugService(service);
+bool runService(ServiceBase& service) {
+	return debugService(service);
 }
 
-bool debugService(ServiceBase& service)
-{
-    spdlog::info("Running service: {}", service.getDisplayName());
-    if (service.onStart())
-    {
-        while (true)
-        {
-            service.doWork();
-        }
-        return true;
-    }
-    return false;
+bool debugService(ServiceBase& service) {
+	spdlog::info("Running service: {}", service.getDisplayName());
+	if (service.onStart()) {
+		while (true) {
+			service.doWork();
+		}
+		return true;
+	}
+	return false;
 }
 
 } // namespace Service

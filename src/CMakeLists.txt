@@ -5,7 +5,7 @@ include(../cmake/paths_and_names.cmake)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 option(RUN_CLANG_TIDY "run clang-tidy on all sources" ON)
-option(RUN_CLANG_FORMAT "run clang-format on all sources" ON)
+option(CONFIGURE_CLANG_FORMAT "run clang-format on all sources" ON)
 
 if (RUN_CLANG_TIDY)
     find_program(CLANG_TIDY "clang-tidy")
@@ -17,11 +17,17 @@ if (RUN_CLANG_TIDY)
     endif()
 endif()
 
-if (RUN_CLANG_FORMAT)
+if (CONFIGURE_CLANG_FORMAT)
     find_program(CLANG_FORMAT "clang-format")
     if (CLANG_FORMAT)
         message(STATUS "found clang-format")
-        set(CMAKE_CXX_CLANG_FORMAT ${CLANG_FORMAT})
+        file(GLOB_RECURSE ALL_SOURCES "*.cpp" "*.hpp")
+		add_custom_target(format_apply
+			COMMAND ${CLANG_FORMAT} -i --style=file:${CMAKE_SOURCE_DIR}/.clang-format ${ALL_SOURCES}
+			COMMENT "applying clang-format suggestions...")
+		add_custom_target(format_check
+			COMMAND ${CLANG_FORMAT} --dry-run --style=file:${CMAKE_SOURCE_DIR}/.clang-format ${ALL_SOURCES}
+			COMMENT "checking with clang-format...")
     else()
         message(WARNING "clang-format not found, skipping")
     endif()
