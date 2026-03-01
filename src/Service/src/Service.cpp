@@ -10,10 +10,13 @@ namespace
 class Service final
 {
 public:
+	explicit Service(ServiceBase& service);
+
     Service(Service& other) = delete;
     void operator=(Service& other) = delete;
-    static std::unique_ptr<Service>& CreateInstance(ServiceBase& service);
-	static std::unique_ptr<Service>& GetInstance();
+
+    static std::unique_ptr<Service>& createInstance(ServiceBase& service);
+	static std::unique_ptr<Service>& getInstance();
 
 	void start();
 	void stop();
@@ -21,12 +24,10 @@ public:
 	[[maybe_unused]] Status getStatus() const;
 	int debug();
 
-	static void signal_term(int signal);
-	static void signal_handler(int signal);
+	static void signalTerm(int signal);
+	static void signalHandler(int signal);
 
 private:
-	explicit Service(ServiceBase& service);
-
 	static std::unique_ptr<Service> m_instance;
 	ServiceBase& m_service;
 	Status m_status;
@@ -37,7 +38,7 @@ Service::Service(ServiceBase& service)
 
 std::unique_ptr<Service> Service::m_instance{nullptr};
 
-std::unique_ptr<Service>& Service::CreateInstance(ServiceBase& service)
+std::unique_ptr<Service>& Service::createInstance(ServiceBase& service)
 {
 	if (m_instance != nullptr)
 	{
@@ -49,7 +50,7 @@ std::unique_ptr<Service>& Service::CreateInstance(ServiceBase& service)
 	return m_instance;
 }
 
-std::unique_ptr<Service>& Service::GetInstance()
+std::unique_ptr<Service>& Service::getInstance()
 {
 	return m_instance;
 }
