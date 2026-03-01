@@ -22,7 +22,7 @@ if (RUN_CODE_COVERAGE)
                     "-o" "CoverageReport/${MODULE}"
                 )
                 add_custom_command(
-                    TARGET ${TEST_PROGRA}
+                    TARGET ${TEST_PROGRAM}
                     POST_BUILD
                     COMMAND bash -c './${TEST_PROGRAM}\; ${COVERAGE_TOOL} ${COVERAGE_TOOL_ARGS} ${CMAKE_CURRENT_BINARY_DIR}
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
