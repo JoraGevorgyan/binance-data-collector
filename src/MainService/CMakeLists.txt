@@ -1,0 +1,11 @@
+include(../sources.cmake)
+
+set(SERVICE_VERSION "${CMAKE_PROJECT_VERSION}")
+set(NAME MainService)
+
+add_library(${NAME} ${SOURCES} ${HEADERS})
+target_compile_definitions(
+    PRIVATE
+    SERVICE_VERSION="${SERVICE_VERSION}"
+    NAME_SERVICE="${NAME_SERVICE}"
+)
