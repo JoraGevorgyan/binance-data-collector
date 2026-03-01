@@ -6,7 +6,7 @@ namespace Service {
 namespace {
 
 class Service final {
-   public:
+public:
 	explicit Service(ServiceBase& service);
 
 	Service(Service& other) = delete;
@@ -24,7 +24,7 @@ class Service final {
 	static void signalTerm(int signal);
 	static void signalHandler(int signal);
 
-   private:
+private:
 	static std::unique_ptr<Service> m_instance;
 	ServiceBase& m_service;
 	Status m_status;

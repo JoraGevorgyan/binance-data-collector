@@ -6,7 +6,7 @@
 namespace Service {
 
 class ServiceBase {
-   public:
+public:
 	explicit ServiceBase(std::string_view name, std::string_view display_name);
 	virtual ~ServiceBase() = default;
 
@@ -23,7 +23,7 @@ class ServiceBase {
 
 	int onDebug();
 
-   protected:
+protected:
 	const std::string m_name;
 	const std::string m_display_name;
 	int m_exit_code = 0;
