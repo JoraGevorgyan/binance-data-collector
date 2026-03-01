@@ -33,6 +33,13 @@ if (CONFIGURE_CLANG_FORMAT)
     endif()
 endif()
 
+find_package(
+	Boost 1.83 REQUIRED
+	COMPONENTS
+		program_options
+		unit_test_framework
+	)
+
 add_subdirectory(binance-data-collector)
 add_subdirectory(Service)
 

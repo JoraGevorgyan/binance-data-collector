@@ -1,9 +1,12 @@
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/spdlog.h"
 
+#include <boost/program_options.hpp>
+
 #include <iostream>
 
 namespace DataCollector {
+
 int mainImpl(int argc, char* argv[]) {
 	// Register logger with hardcoded YET(get it from config in future)
 	try {
@@ -29,6 +32,7 @@ int mainImpl(int argc, char* argv[]) {
 
 	return 0;
 }
+
 } // namespace DataCollector
 
 int main(int argc, char* argv[]) {

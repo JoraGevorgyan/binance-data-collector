@@ -4,6 +4,3 @@
 [submodule "thirdparty/nlohmann-json"]
 	path = thirdparty/nlohmann-json
 	url = ../nlohmann-json.git
-[submodule "thirdparty/boost"]
-	path = thirdparty/boost
-	url =../boost.git
