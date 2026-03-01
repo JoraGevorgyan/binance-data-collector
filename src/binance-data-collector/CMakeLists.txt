@@ -9,5 +9,5 @@ add_executable(${EXECUTABLE_NAME} ${SOURCES} ${HEADERS} ${RESOURCES})
 target_link_libraries(
     ${EXECUTABLE_NAME}
     PRIVATE
-        MainService
+        Service
 )

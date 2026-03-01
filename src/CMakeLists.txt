@@ -28,7 +28,7 @@ if (RUN_CLANG_FORMAT)
 endif()
 
 add_subdirectory(binance-data-collector)
-add_subdirectory(MainService)
+add_subdirectory(Service)
 
 
 # not supported yet
