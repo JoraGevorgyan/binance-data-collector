@@ -10,5 +10,6 @@ target_link_libraries(
     ${EXECUTABLE_NAME}
     PRIVATE
         Service
+		Config
         ${LOGGER_NAME}
 )
