@@ -1,5 +1,6 @@
-#include "Config/Config.hpp"
 #include <iostream>
+#include "Config/Config.hpp"
+#include "Service/Service.hpp"
 
 namespace DataCollector {
 

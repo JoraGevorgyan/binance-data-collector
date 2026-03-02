@@ -40,11 +40,11 @@ bool Config::init(int argc, char* argv[]) {
 	return true;
 }
 
-bool Config::initLogger() const noexcept{
+bool Config::initLogger() const noexcept {
 	try {
 		const auto log_path = m_po_var_map["log-path"].as<std::string>();
 		auto log_level = m_po_var_map["log-level"].as<std::string>();
-		
+
 		if (isDebugMode()) {
 			log_level = "debug";
 		}
@@ -53,7 +53,7 @@ bool Config::initLogger() const noexcept{
 		    getLogPath(), true);
 		std::vector<spdlog::sink_ptr> sinks{file_sink};
 		auto logger = std::make_shared<spdlog::logger>(
-			"binance-data-collector", sinks.begin(), sinks.end());
+		    "binance-data-collector", sinks.begin(), sinks.end());
 		spdlog::register_logger(logger);
 		spdlog::set_default_logger(logger);
 		spdlog::set_level(spdlog::level::info);
