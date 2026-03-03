@@ -22,6 +22,7 @@ public:
 	bool isHelp() const noexcept;
 	bool isDebugMode() const noexcept;
 
+	void printHelp() const noexcept;
 	std::string_view getServiceName() const noexcept;
 	std::string_view getServiceDisplayName() const noexcept;
 	std::chrono::seconds getConnectPeriod() const noexcept;
@@ -29,7 +30,7 @@ public:
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
 	std::string getStatsOutputPath() const noexcept;
 	std::vector<std::string> getSymbols() const noexcept;
-	void printHelp() const noexcept;
+	std::size_t getMaxThreadsNum() const noexcept;
 
 private:
 	static std::unique_ptr<Config> m_instance;
@@ -43,6 +44,7 @@ private:
 	std::optional<std::chrono::seconds> m_stats_flush_period;
 	std::optional<std::string> m_stats_output_path;
 	std::optional<std::vector<std::string>> m_symbols;
+	std::optional<std::size_t> m_max_threads_num;
 
 private:
 	std::string getLogLevel() const noexcept;

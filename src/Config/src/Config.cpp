@@ -1,6 +1,6 @@
 #include "../Config.hpp"
-#include "spdlog/sinks/basic_file_sink.h"
 #include <iostream>
+#include "spdlog/sinks/basic_file_sink.h"
 
 namespace Config {
 
@@ -154,6 +154,10 @@ std::string Config::getStatsOutputPath() const noexcept {
 
 std::vector<std::string> Config::getSymbols() const noexcept {
 	return m_symbols.value_or(g_def_stats_c);
+}
+
+std::size_t Config::getMaxThreadsNum() const noexcept {
+	return m_max_threads_num.value_or(4);
 }
 
 } // namespace Config
