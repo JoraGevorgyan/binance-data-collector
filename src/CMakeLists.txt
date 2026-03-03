@@ -1,6 +1,6 @@
 include(lang-options.cmake)
-include(tests/testing.cmake)
 include(../cmake/paths_and_names.cmake)
+include(tests/testing.cmake)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
