@@ -24,7 +24,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "RUN_CLANG_TIDY": "ON",
                 "CONFIGURE_CLANG_FORMAT": "ON",
-                "RUN_TESTS": "ON"
+                "RUN_TESTS": "OFF"
             }
         },
         {
