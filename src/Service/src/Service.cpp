@@ -105,8 +105,7 @@ std::unique_ptr<Service>& Service::getInstance() {
 
 void Service::signalTerm(int sig_num) {
 	spdlog::info("Received termination signal: {}", sig_num);
-	if (sig_num == SIGABRT || sig_num == SIGSEGV || sig_num == SIGTERM ||
-	    sig_num == SIGKILL) {
+	if (sig_num == SIGABRT || sig_num == SIGSEGV || sig_num == SIGTERM) {
 		spdlog::error("Abnormal termination signal received: {}", sig_num);
 		signal(sig_num, SIG_DFL);
 		kill(getpid(), sig_num);
@@ -143,14 +142,12 @@ void setupSigAction(struct sigaction& sig_action) {
 	sigaddset(&s_set, SIGABRT);
 	sigaddset(&s_set, SIGSEGV);
 	sigaddset(&s_set, SIGTERM);
-	sigaddset(&s_set, SIGKILL);
 	sig_action.sa_handler = Service::signalTerm;
 	sig_action.sa_mask = s_set;
 	sig_action.sa_flags = 0;
 	sigaction(SIGABRT, &sig_action, nullptr);
 	sigaction(SIGSEGV, &sig_action, nullptr);
 	sigaction(SIGTERM, &sig_action, nullptr);
-	sigaction(SIGKILL, &sig_action, nullptr);
 
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGHUP, Service::signalHandler);
