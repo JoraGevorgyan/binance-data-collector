@@ -1,40 +1,27 @@
-#include "Service/ServiceBase.hpp"
 #include <boost/test/unit_test.hpp>
+#include "Service/ServiceBase.hpp"
 
 namespace {
 
 class FakeService final : public Service::ServiceBase {
 public:
 	explicit FakeService(const bool should_start)
-	    : ServiceBase("test-name", "Test Display Name"), m_should_start(should_start) {}
+	    : ServiceBase("test-name", "Test Display Name"),
+	      m_should_start(should_start) {}
 
-	bool onStart() override {
-		return m_should_start;
-	}
+	bool onStart() override { return m_should_start; }
 
-	bool onStop() override {
-		return true;
-	}
+	bool onStop() override { return true; }
 
-	bool onPause() override {
-		return true;
-	}
+	bool onPause() override { return true; }
 
-	bool onResume() override {
-		return true;
-	}
+	bool onResume() override { return true; }
 
-	bool onShutdown() override {
-		return true;
-	}
+	bool onShutdown() override { return true; }
 
-	bool onReload() override {
-		return true;
-	}
+	bool onReload() override { return true; }
 
-	void doWork() override {
-		m_exit_code = 7;
-	}
+	void doWork() override { m_exit_code = 7; }
 
 private:
 	bool m_should_start;

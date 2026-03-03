@@ -1,5 +1,5 @@
-#include "Config/Config.hpp"
 #include <boost/test/unit_test.hpp>
+#include "Config/Config.hpp"
 
 BOOST_AUTO_TEST_CASE(config_parses_help_and_debug_flags) {
 	char program_name[] = "config-flags-test";

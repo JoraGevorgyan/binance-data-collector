@@ -1,5 +1,5 @@
-#include "common/Canceler.hpp"
 #include <boost/test/unit_test.hpp>
+#include "common/Canceler.hpp"
 
 BOOST_AUTO_TEST_CASE(canceler_default_state_is_not_canceled) {
 	Canceler::Canceler canceler;
