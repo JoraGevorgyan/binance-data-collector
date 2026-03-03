@@ -43,6 +43,7 @@ find_package(
 add_subdirectory(binance-data-collector)
 add_subdirectory(Service)
 add_subdirectory(Config)
+add_subdirectory(common)
 
 # not supported yet
 #include(cpack-config.cmake)
