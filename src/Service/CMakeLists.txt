@@ -6,17 +6,18 @@ set(NAME Service)
 add_library(${NAME} ${SOURCES} ${HEADERS})
 
 target_compile_definitions(
-    ${NAME}
-    PRIVATE
-    SERVICE_VERSION="${SERVICE_VERSION}"
-    NAME_SERVICE="${NAME_SERVICE}"
+	${NAME}
+	PRIVATE
+		SERVICE_VERSION="${SERVICE_VERSION}"
+		NAME_SERVICE="${NAME_SERVICE}"
 )
 
 target_link_libraries(
-    ${NAME}
-    PRIVATE
-		Config
+	${NAME}
+	PRIVATE
 		common
+		Config
+		DataCollector
 		Boost::system
 		OpenSSL::SSL
 		OpenSSL::Crypto

@@ -2,7 +2,6 @@
 #include <boost/program_options.hpp>
 #include <memory>
 #include <string_view>
-#include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/spdlog.h"
 
 namespace Config {

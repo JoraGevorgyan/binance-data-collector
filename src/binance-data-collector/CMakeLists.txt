@@ -1,5 +1,5 @@
 add_compile_definitions(
-    APP_NAME="${APP_NAME}"
+	APP_NAME="${APP_NAME}"
 )
 
 include(../sources.cmake)
@@ -10,9 +10,9 @@ install(
 	RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
 )
 target_link_libraries(
-    ${EXECUTABLE_NAME}
-    PRIVATE
-        Service
+	${EXECUTABLE_NAME}
+	PRIVATE
+		Service
 		Config
         ${LOGGER_NAME}
 )
