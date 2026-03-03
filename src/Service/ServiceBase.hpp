@@ -10,8 +10,8 @@ public:
 	explicit ServiceBase(std::string_view name, std::string_view display_name);
 	virtual ~ServiceBase() = default;
 
-	const char* getName() const;
-	const char* getDisplayName() const;
+	std::string_view getName() const;
+	std::string_view getDisplayName() const;
 
 	virtual bool onStart() = 0;
 	virtual bool onStop() = 0;

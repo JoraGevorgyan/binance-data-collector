@@ -4,15 +4,16 @@
 #include <thread>
 
 namespace Service {
+
 ServiceBase::ServiceBase(std::string_view name, std::string_view display_name)
     : m_name(name), m_display_name(display_name) {}
 
-const char* ServiceBase::getName() const {
-	return m_name.c_str();
+std::string_view ServiceBase::getName() const {
+	return m_name;
 }
 
-const char* ServiceBase::getDisplayName() const {
-	return m_display_name.c_str();
+std::string_view ServiceBase::getDisplayName() const {
+	return m_display_name;
 }
 
 int ServiceBase::onDebug() {
