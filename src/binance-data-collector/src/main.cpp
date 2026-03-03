@@ -17,7 +17,7 @@ int mainImpl(int argc, char* argv[]) {
 		config->printHelp();
 		return EXIT_SUCCESS;
 	}
-	if (!(config->initLogger() && config->updateConfig())) {
+	if (!(config->updateConfig() && config->initLogger())) {
 		return EXIT_FAILURE;
 	}
 

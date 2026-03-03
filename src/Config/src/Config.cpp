@@ -5,8 +5,26 @@ namespace Config {
 
 namespace {
 
-constexpr auto service_name_c = "binance-data-collector-service";
-constexpr auto service_display_name_c = "Binance Data Collector Service";
+namespace Key {
+
+constexpr auto log_path = "log-path";
+constexpr auto log_level = "log-level";
+constexpr auto debug = "debug";
+constexpr auto config = "config";
+constexpr auto help = "help";
+
+} // namespace Key
+
+constexpr auto g_service_name_c = "binance-data-collector-service";
+constexpr auto g_service_display_name_c = "Binance Data Collector Service";
+
+std::string getLogPath(const po::variables_map& var_map) noexcept {
+	return var_map[Key::log_path].as<std::string>();
+}
+
+std::string getConfigPath(const po::variables_map& var_map) noexcept {
+	return var_map[Key::config].as<std::string>();
+}
 
 } // namespace
 
@@ -20,18 +38,25 @@ std::unique_ptr<Config>& Config::getInstance() {
 	return m_instance;
 }
 
-bool Config::init(int argc, char* argv[]) {
+std::string Config::getLogLevel() const noexcept {
+	if (m_po_var_map.count(Key::log_level) > 0) { // CLI overrides config file
+		return m_po_var_map[Key::log_level].as<std::string>();
+	}
+	return m_log_level.value_or("info");
+}
+
+bool Config::init(int argc, char* argv[]) noexcept {
 	try {
 		constexpr auto def_conf_p = "/etc/binance-data-collector/config.yaml";
 		constexpr auto def_log_p = "/var/log/binance-data-collector/cur.log";
-		m_po_desc.add_options()("help,h", "produce help message")(
-		    "config,c", po::value<std::string>()->default_value(def_conf_p),
+		m_po_desc.add_options()(Key::help, "produce help message")(
+		    Key::config, po::value<std::string>()->default_value(def_conf_p),
 		    "path to config file")(
-		    "log-path", po::value<std::string>()->default_value(def_log_p),
+		    Key::log_path, po::value<std::string>()->default_value(def_log_p),
 		    "path to log file")(
-		    "log-level,l", po::value<std::string>()->default_value("info"),
+		    Key::log_level, po::value<std::string>()->default_value("info"),
 		    "log level (trace, debug, info, warn, error, critical, off)")(
-		    "debug,d", po::bool_switch()->default_value(false),
+		    Key::debug, po::bool_switch()->default_value(false),
 		    "enable debug mode (overrides log level to debug)");
 
 		po::store(po::parse_command_line(argc, argv, m_po_desc), m_po_var_map);
@@ -49,15 +74,13 @@ bool Config::init(int argc, char* argv[]) {
 
 bool Config::initLogger() const noexcept {
 	try {
-		const auto log_path = m_po_var_map["log-path"].as<std::string>();
-		auto log_level = m_po_var_map["log-level"].as<std::string>();
-
+		auto log_level = getLogLevel();
 		if (isDebugMode()) {
 			log_level = "debug";
 		}
 
 		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-		    getLogPath(), true);
+		    getLogPath(m_po_var_map), true);
 		std::vector<spdlog::sink_ptr> sinks{file_sink};
 		auto logger = std::make_shared<spdlog::logger>(
 		    "binance-data-collector", sinks.begin(), sinks.end());
@@ -75,9 +98,10 @@ bool Config::initLogger() const noexcept {
 	return true;
 }
 
-bool Config::updateConfig() const noexcept {
+bool Config::updateConfig() noexcept {
 	try {
-		auto config_path = getConfigPath();
+		auto config_path = getConfigPath(m_po_var_map);
+
 		// load config from file and update
 		// or generate the default one if doesn't exist
 	} catch (const std::exception& err) {
@@ -88,7 +112,7 @@ bool Config::updateConfig() const noexcept {
 }
 
 bool Config::isHelp() const noexcept {
-	return m_po_var_map.count("help") > 0;
+	return m_po_var_map.count(Key::help) > 0;
 }
 
 void Config::printHelp() const noexcept {
@@ -96,31 +120,23 @@ void Config::printHelp() const noexcept {
 }
 
 bool Config::isDebugMode() const noexcept {
-	return m_po_var_map["debug"].as<bool>();
-}
-
-std::string Config::getLogPath() const noexcept {
-	return m_po_var_map["log-path"].as<std::string>();
-}
-
-std::string Config::getConfigPath() const noexcept {
-	return m_po_var_map["config"].as<std::string>();
+	return m_po_var_map[Key::debug].as<bool>();
 }
 
 std::string_view Config::getServiceName() const noexcept {
-	return service_name_c;
+	return g_service_name_c;
 }
 
 std::string_view Config::getServiceDisplayName() const noexcept {
-	return service_display_name_c;
+	return g_service_display_name_c;
 }
 
 std::chrono::seconds Config::getIdleConnectPeriod() const noexcept {
-	return m_idle_connect_period;
+	return m_idle_connect_period.value_or(std::chrono::seconds(60));
 }
 
 std::chrono::seconds Config::getCheckPeriod() const noexcept {
-	return m_check_period;
+	return m_check_period.value_or(std::chrono::seconds(10));
 }
 
 } // namespace Config

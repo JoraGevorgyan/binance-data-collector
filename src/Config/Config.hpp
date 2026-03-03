@@ -16,9 +16,9 @@ public:
 
 	static std::unique_ptr<Config>& getInstance();
 
-	bool init(int argc, char* argv[]);
+	bool init(int argc, char* argv[]) noexcept;
+	bool updateConfig() noexcept;
 	bool initLogger() const noexcept;
-	bool updateConfig() const noexcept;
 
 	bool isHelp() const noexcept;
 	bool isDebugMode() const noexcept;
@@ -34,12 +34,12 @@ private:
 	po::variables_map m_po_var_map;
 	po::options_description m_po_desc{"Allowed options"};
 
-	std::chrono::seconds m_idle_connect_period{60};
-	std::chrono::seconds m_check_period{10};
+	std::optional<std::string> m_log_level;
+	std::optional<std::chrono::seconds> m_idle_connect_period;
+	std::optional<std::chrono::seconds> m_check_period;
 
 private:
-	std::string getLogPath() const noexcept;
-	std::string getConfigPath() const noexcept;
+	std::string getLogLevel() const noexcept;
 
 private:
 	Config() = default;
