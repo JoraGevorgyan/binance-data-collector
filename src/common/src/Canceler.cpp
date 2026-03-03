@@ -8,11 +8,11 @@ void Canceler::cancel(const State state) noexcept {
 }
 
 void Canceler::reset() noexcept {
-	m_state.store(0x00000000);
+	m_state.store(0x00000000u);
 }
 
 bool Canceler::isCanceled() const noexcept {
-	return m_state.load() & 0x00000001u;
+	return static_cast<bool>(m_state.load() & 0x00000001u);
 }
 
 uint32_t Canceler::getState() const noexcept {
