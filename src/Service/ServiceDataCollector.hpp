@@ -20,6 +20,9 @@ public:
 private:
 	Config::Config& m_config;
 	Canceler::Canceler m_canceler;
+
+private:
+	void doMainWork() noexcept;
 };
 
 } // namespace Service
