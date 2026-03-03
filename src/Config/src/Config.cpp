@@ -101,9 +101,10 @@ bool Config::initLogger() const noexcept {
 bool Config::updateConfig() noexcept {
 	try {
 		auto config_path = getConfigPath(m_po_var_map);
-
-		// load config from file and update
-		// or generate the default one if doesn't exist
+		// TODO:
+		// 1. get config file and parse if exists
+		// 2. update existing values(override with CLI if provided)
+		// 3. validate and apply updated config to a file
 	} catch (const std::exception& err) {
 		std::cerr << "Error updating config: " << err.what() << std::endl;
 		return false;
