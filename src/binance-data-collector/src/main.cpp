@@ -1,6 +1,7 @@
 #include <iostream>
 #include "Config/Config.hpp"
 #include "Service/Service.hpp"
+#include "Service/ServiceDataCollector.hpp"
 
 namespace DataCollector {
 
@@ -22,8 +23,8 @@ int mainImpl(int argc, char* argv[]) {
 	}
 
 	spdlog::info("Binance Data Collector started");
-
-	return EXIT_SUCCESS;
+	Service::ServiceDataCollector data_collector(*config);
+	return Service::runService(data_collector) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 } // namespace DataCollector

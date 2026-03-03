@@ -36,9 +36,13 @@ endif()
 find_package(
 	Boost 1.83 REQUIRED
 	COMPONENTS
+		system
 		program_options
 		unit_test_framework
 	)
+
+find_package(
+	OpenSSL REQUIRED)
 
 add_subdirectory(binance-data-collector)
 add_subdirectory(Service)

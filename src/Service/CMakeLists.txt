@@ -15,7 +15,11 @@ target_compile_definitions(
 target_link_libraries(
     ${NAME}
     PRIVATE
-    	Config
+		Config
 		common
+		Boost::system
+		OpenSSL::SSL
+		OpenSSL::Crypto
+		nlohmann_json::nlohmann_json
 		${LOGGER_NAME}
 )

@@ -25,8 +25,11 @@ public:
 
 	std::string_view getServiceName() const noexcept;
 	std::string_view getServiceDisplayName() const noexcept;
-	std::chrono::seconds getIdleConnectPeriod() const noexcept;
+	std::chrono::seconds getConnectPeriod() const noexcept;
 	std::chrono::seconds getCheckPeriod() const noexcept;
+	std::chrono::seconds getStatsFlushPeriod() const noexcept;
+	std::string getStatsOutputPath() const noexcept;
+	std::vector<std::string> getSymbols() const noexcept;
 	void printHelp() const noexcept;
 
 private:
@@ -35,8 +38,12 @@ private:
 	po::options_description m_po_desc{"Allowed options"};
 
 	std::optional<std::string> m_log_level;
-	std::optional<std::chrono::seconds> m_idle_connect_period;
+
+	std::optional<std::chrono::seconds> m_connect_period;
 	std::optional<std::chrono::seconds> m_check_period;
+	std::optional<std::chrono::seconds> m_stats_flush_period;
+	std::optional<std::string> m_stats_output_path;
+	std::optional<std::vector<std::string>> m_symbols;
 
 private:
 	std::string getLogLevel() const noexcept;

@@ -52,10 +52,10 @@ void ServiceDataCollector::doMainWork() noexcept {
 }
 
 void ServiceDataCollector::doWork() {
-	auto interval = m_config.getIdleConnectPeriod();
+	auto interval = m_config.getConnectPeriod();
 	while (!m_canceler.isCanceled()) {
 		spdlog::info("Service {} is working...", m_display_name.c_str());
-		if (interval >= m_config.getIdleConnectPeriod()) {
+		if (interval >= m_config.getConnectPeriod()) {
 			doMainWork();
 			interval = std::chrono::seconds(0);
 		}

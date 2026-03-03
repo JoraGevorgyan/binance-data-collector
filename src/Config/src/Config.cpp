@@ -17,6 +17,10 @@ constexpr auto help = "help";
 
 constexpr auto g_service_name_c = "binance-data-collector-service";
 constexpr auto g_service_display_name_c = "Binance Data Collector Service";
+// TODO: add working dir in future and save all files there
+constexpr auto g_def_stats_out_path_c =
+    "/var/log/binance-data-collector/stats.log";
+const std::vector<std::string> g_def_stats_c = {"BTCUSDT", "ETHUSDT"};
 
 std::string getLogPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::log_path].as<std::string>();
@@ -132,12 +136,23 @@ std::string_view Config::getServiceDisplayName() const noexcept {
 	return g_service_display_name_c;
 }
 
-std::chrono::seconds Config::getIdleConnectPeriod() const noexcept {
-	return m_idle_connect_period.value_or(std::chrono::seconds(60));
+std::chrono::seconds Config::getConnectPeriod() const noexcept {
+	return m_connect_period.value_or(std::chrono::seconds(60));
 }
 
 std::chrono::seconds Config::getCheckPeriod() const noexcept {
 	return m_check_period.value_or(std::chrono::seconds(10));
+}
+std::chrono::seconds Config::getStatsFlushPeriod() const noexcept {
+	return m_stats_flush_period.value_or(std::chrono::seconds(40));
+}
+
+std::string Config::getStatsOutputPath() const noexcept {
+	return m_stats_output_path.value_or(g_def_stats_out_path_c);
+}
+
+std::vector<std::string> Config::getSymbols() const noexcept {
+	return m_symbols.value_or(g_def_stats_c);
 }
 
 } // namespace Config
