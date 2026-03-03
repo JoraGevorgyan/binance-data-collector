@@ -15,5 +15,7 @@ target_compile_definitions(
 target_link_libraries(
     ${NAME}
     PRIVATE
-    ${LOGGER_NAME}
+    	Config
+		common
+		${LOGGER_NAME}
 )
