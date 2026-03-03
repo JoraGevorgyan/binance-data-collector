@@ -1,12 +1,14 @@
 #pragma once
 
+#include "../Config/Config.hpp"
+#include "../common/Canceler.hpp"
 #include "Service.hpp"
 
 namespace Service {
 
-class DataCollector : public ServiceBase {
+class ServiceDataCollector : public ServiceBase {
 public:
-	explicit DataCollector() = default;
+	explicit ServiceDataCollector(Config::Config& config);
 	bool onStart() override;
 	bool onStop() override;
 	bool onPause() override;
@@ -16,6 +18,8 @@ public:
 	void doWork() override;
 
 private:
+	Config::Config& m_config;
+	Canceler::Canceler m_canceler;
 };
 
 } // namespace Service
