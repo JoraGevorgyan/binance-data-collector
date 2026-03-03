@@ -56,6 +56,7 @@ void ServiceDataCollector::doMainWork() noexcept {
 			DataCollector::BinanceWebSocketClient client(m_config, m_canceler);
 			if (!client.runWebSocketSession()) {
 				spdlog::error("BinanceWebSocket client failed. Retrying...");
+				m_config.updateConfig();
 			}
 			interval = std::chrono::seconds(0);
 		}
