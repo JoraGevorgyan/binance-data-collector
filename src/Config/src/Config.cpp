@@ -3,6 +3,13 @@
 
 namespace Config {
 
+namespace {
+
+constexpr auto service_name_c = "binance-data-collector-service";
+constexpr auto service_display_name_c = "Binance Data Collector Service";
+
+} // namespace
+
 std::unique_ptr<Config> Config::m_instance = nullptr;
 
 std::unique_ptr<Config>& Config::getInstance() {
@@ -98,6 +105,22 @@ std::string Config::getLogPath() const noexcept {
 
 std::string Config::getConfigPath() const noexcept {
 	return m_po_var_map["config"].as<std::string>();
+}
+
+std::string_view Config::getServiceName() const noexcept {
+	return service_name_c;
+}
+
+std::string_view Config::getServiceDisplayName() const noexcept {
+	return service_display_name_c;
+}
+
+std::chrono::seconds Config::getIdleConnectPeriod() const noexcept {
+	return m_idle_connect_period;
+}
+
+std::chrono::seconds Config::getCheckPeriod() const noexcept {
+	return m_check_period;
 }
 
 } // namespace Config
