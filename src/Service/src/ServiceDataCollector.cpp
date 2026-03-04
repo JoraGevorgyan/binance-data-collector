@@ -55,9 +55,11 @@ void ServiceDataCollector::doMainWork() noexcept {
 		if (interval >= m_config.getConnectPeriod()) {
 			DataCollector::BinanceWebSocketClient client(m_config, m_canceler);
 			if (!client.runWebSocketSession()) {
+				m_exit_code = EXIT_FAILURE;
 				spdlog::error("BinanceWebSocket client failed. Retrying...");
 				m_config.updateConfig();
 			}
+			m_exit_code = EXIT_SUCCESS;
 			interval = std::chrono::seconds(0);
 		}
 		std::this_thread::sleep_for(m_config.getCheckPeriod());
@@ -65,7 +67,7 @@ void ServiceDataCollector::doMainWork() noexcept {
 	}
 
 	spdlog::info("Service {} is exiting...", m_display_name.c_str());
-	m_exit_code = 0;
+	m_exit_code = EXIT_SUCCESS;
 }
 
 } // namespace Service

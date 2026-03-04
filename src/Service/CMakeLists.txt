@@ -18,9 +18,5 @@ target_link_libraries(
 		common
 		Config
 		DataCollector
-		Boost::system
-		OpenSSL::SSL
-		OpenSSL::Crypto
-		nlohmann_json::nlohmann_json
 		${LOGGER_NAME}
 )
