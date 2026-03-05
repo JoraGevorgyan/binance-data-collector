@@ -49,17 +49,29 @@ void ServiceDataCollector::doWork() {
 }
 
 void ServiceDataCollector::doMainWork() noexcept {
+	auto max_retries = m_config.getMaxRetriesNum();
 	auto interval = m_config.getConnectPeriod();
+	auto retries = 0U;
 	while (!m_canceler.isCanceled()) {
 		spdlog::info("Service {} is working...", m_display_name.c_str());
+
 		if (interval >= m_config.getConnectPeriod()) {
 			DataCollector::BinanceWebSocketClient client(m_config, m_canceler);
 			if (!client.runWebSocketSession()) {
 				m_exit_code = EXIT_FAILURE;
-				spdlog::error("BinanceWebSocket client failed. Retrying...");
-				m_config.updateConfig();
+				if (++retries >= max_retries) {
+					spdlog::error("Reached max retries num({}). Exiting...",
+					              max_retries);
+					break;
+				}
+				spdlog::warn("session failed. Retrying...");
+			} else {
+				m_exit_code = EXIT_SUCCESS;
+				spdlog::info(
+				    "BinanceWebSocket client session ended gracefully.");
 			}
-			m_exit_code = EXIT_SUCCESS;
+			m_config.updateConfig();
+			max_retries = m_config.getMaxRetriesNum();
 			interval = std::chrono::seconds(0);
 		}
 		std::this_thread::sleep_for(m_config.getCheckPeriod());

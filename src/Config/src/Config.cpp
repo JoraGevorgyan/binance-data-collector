@@ -132,6 +132,18 @@ bool Config::updateConfig() noexcept {
 		// 1. get config file and parse if exists
 		// 2. update existing values(override with CLI if provided)
 		// 3. validate and apply updated config to a file
+		// 4. think about which ones need to be configurable and which ones can
+		// be hardcoded
+		m_log_level = spdlog::level::info;
+		m_connect_period = std::chrono::seconds(60);
+		m_check_period = std::chrono::seconds(10);
+
+		m_max_retries_num = 100;
+		m_stats_flush_period = std::chrono::seconds(40);
+		m_stats_output_path = g_def_stats_out_path_c;
+		m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
+		m_symbols = g_def_stats_c;
+		m_streams = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
 	} catch (const std::exception& err) {
 		std::cerr << "Error updating config: " << err.what() << std::endl;
 		return false;
@@ -160,26 +172,34 @@ std::string_view Config::getServiceDisplayName() const noexcept {
 }
 
 std::chrono::seconds Config::getConnectPeriod() const noexcept {
-	return m_connect_period.value_or(std::chrono::seconds(60));
+	return m_connect_period;
+}
+
+std::size_t Config::getMaxRetriesNum() const noexcept {
+	return m_max_retries_num;
 }
 
 std::chrono::seconds Config::getCheckPeriod() const noexcept {
-	return m_check_period.value_or(std::chrono::seconds(10));
+	return m_check_period;
 }
 std::chrono::seconds Config::getStatsFlushPeriod() const noexcept {
-	return m_stats_flush_period.value_or(std::chrono::seconds(40));
+	return m_stats_flush_period;
 }
 
 std::string Config::getStatsOutputPath() const noexcept {
-	return m_stats_output_path.value_or(g_def_stats_out_path_c);
+	return m_stats_output_path;
 }
 
 std::vector<std::string> Config::getSymbols() const noexcept {
-	return m_symbols.value_or(g_def_stats_c);
+	return m_symbols;
 }
 
 std::size_t Config::getMaxThreadsNum() const noexcept {
-	return m_max_threads_num.value_or(4);
+	return m_max_threads_num;
+}
+
+std::vector<std::string> Config::getStreams() const noexcept {
+	return m_streams;
 }
 
 } // namespace Config

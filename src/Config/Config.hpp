@@ -27,10 +27,12 @@ public:
 	std::string_view getServiceDisplayName() const noexcept;
 	std::chrono::seconds getConnectPeriod() const noexcept;
 	std::chrono::seconds getCheckPeriod() const noexcept;
+	std::size_t getMaxRetriesNum() const noexcept;
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
 	std::string getStatsOutputPath() const noexcept;
 	std::vector<std::string> getSymbols() const noexcept;
 	std::size_t getMaxThreadsNum() const noexcept;
+	std::vector<std::string> getStreams() const noexcept;
 
 private:
 	static std::unique_ptr<Config> m_instance;
@@ -38,12 +40,14 @@ private:
 	po::options_description m_po_desc{"Allowed options"};
 
 	std::optional<spdlog::level::level_enum> m_log_level;
-	std::optional<std::chrono::seconds> m_connect_period;
-	std::optional<std::chrono::seconds> m_check_period;
-	std::optional<std::chrono::seconds> m_stats_flush_period;
-	std::optional<std::string> m_stats_output_path;
-	std::optional<std::vector<std::string>> m_symbols;
-	std::optional<std::size_t> m_max_threads_num;
+	std::chrono::seconds m_connect_period;
+	std::chrono::seconds m_check_period;
+	std::size_t m_max_retries_num;
+	std::chrono::seconds m_stats_flush_period;
+	std::string m_stats_output_path;
+	std::vector<std::string> m_symbols;
+	std::size_t m_max_threads_num;
+	std::vector<std::string> m_streams;
 
 private:
 	spdlog::level::level_enum getLogLevel() const noexcept;
