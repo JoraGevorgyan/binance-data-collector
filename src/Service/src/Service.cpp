@@ -163,7 +163,7 @@ bool debugService(ServiceBase& service) {
 	spdlog::info("running service: {}", service.getDisplayName());
 	struct sigaction sa {};
 	setupSigAction(sa);
-	return Service::createInstance(service)->debug() == 0;
+	return Service::createInstance(service)->debug() == EXIT_SUCCESS;
 }
 
 } // namespace Service

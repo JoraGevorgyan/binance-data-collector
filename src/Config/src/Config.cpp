@@ -1,6 +1,6 @@
 #include "../Config.hpp"
-#include <iostream>
 #include <boost/algorithm/string.hpp>
+#include <iostream>
 #include "spdlog/sinks/basic_file_sink.h"
 
 namespace Config {
@@ -109,7 +109,7 @@ bool Config::initLogger() const noexcept {
 		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
 		    getLogPath(m_po_var_map), true);
 		auto logger = std::make_shared<spdlog::logger>(
-			"binance-data-collector", spdlog::sinks_init_list{file_sink});
+		    "binance-data-collector", spdlog::sinks_init_list{file_sink});
 		logger->set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
 		logger->set_level(log_level);
 		logger->flush_on(spdlog::level::err);
