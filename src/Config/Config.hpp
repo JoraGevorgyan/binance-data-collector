@@ -37,8 +37,7 @@ private:
 	po::variables_map m_po_var_map;
 	po::options_description m_po_desc{"Allowed options"};
 
-	std::optional<std::string> m_log_level;
-
+	std::optional<spdlog::level::level_enum> m_log_level;
 	std::optional<std::chrono::seconds> m_connect_period;
 	std::optional<std::chrono::seconds> m_check_period;
 	std::optional<std::chrono::seconds> m_stats_flush_period;
@@ -47,7 +46,7 @@ private:
 	std::optional<std::size_t> m_max_threads_num;
 
 private:
-	std::string getLogLevel() const noexcept;
+	spdlog::level::level_enum getLogLevel() const noexcept;
 
 private:
 	Config() = default;

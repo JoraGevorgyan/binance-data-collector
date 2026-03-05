@@ -1,5 +1,6 @@
 #include "../Config.hpp"
 #include <iostream>
+#include <boost/algorithm/string.hpp>
 #include "spdlog/sinks/basic_file_sink.h"
 
 namespace Config {
@@ -43,11 +44,32 @@ std::unique_ptr<Config>& Config::getInstance() {
 	return m_instance;
 }
 
-std::string Config::getLogLevel() const noexcept {
+spdlog::level::level_enum Config::getLogLevel() const noexcept {
 	if (m_po_var_map.count(Key::log_level) > 0) { // CLI overrides config file
-		return m_po_var_map[Key::log_level].as<std::string>();
+		const auto level = m_po_var_map[Key::log_level].as<std::string>();
+		if (boost::iequals(level, "trace")) {
+			return spdlog::level::trace;
+		}
+		if (boost::iequals(level, "debug")) {
+			return spdlog::level::debug;
+		}
+		if (boost::iequals(level, "info")) {
+			return spdlog::level::info;
+		}
+		if (boost::iequals(level, "warn")) {
+			return spdlog::level::warn;
+		}
+		if (boost::iequals(level, "error")) {
+			return spdlog::level::err;
+		}
+		if (boost::iequals(level, "critical")) {
+			return spdlog::level::critical;
+		}
+		if (boost::iequals(level, "off")) {
+			return spdlog::level::off;
+		}
 	}
-	return m_log_level.value_or("info");
+	return m_log_level.value_or(spdlog::level::info);
 }
 
 bool Config::init(int argc, char* argv[]) noexcept {
@@ -81,23 +103,23 @@ bool Config::initLogger() const noexcept {
 	try {
 		auto log_level = getLogLevel();
 		if (isDebugMode()) {
-			log_level = "debug";
+			log_level = spdlog::level::debug;
 		}
 
 		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
 		    getLogPath(m_po_var_map), true);
-		std::vector<spdlog::sink_ptr> sinks{file_sink};
 		auto logger = std::make_shared<spdlog::logger>(
-		    "binance-data-collector", sinks.begin(), sinks.end());
+			"binance-data-collector", spdlog::sinks_init_list{file_sink});
+		logger->set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
+		logger->set_level(log_level);
+		logger->flush_on(spdlog::level::err);
 		spdlog::register_logger(logger);
 		spdlog::set_default_logger(logger);
-		spdlog::set_level(spdlog::level::info);
-		spdlog::flush_on(spdlog::level::err);
 	} catch (const spdlog::spdlog_ex& err) {
 		std::cerr << "Error initializing logger: " << err.what() << std::endl;
 		return false;
 	} catch (const std::exception& err) {
-		std::cerr << "Unexcpected error: " << err.what() << std::endl;
+		std::cerr << "Unexpected error: " << err.what() << std::endl;
 		return false;
 	}
 	return true;
