@@ -106,7 +106,7 @@ std::unique_ptr<Service>& Service::getInstance() {
 void Service::signalTerm(int sig_num) {
 	spdlog::info("Received termination signal: {}", sig_num);
 	if (sig_num == SIGABRT || sig_num == SIGSEGV || sig_num == SIGTERM) {
-		spdlog::error("Abnormal termination signal received: {}", sig_num);
+		spdlog::critical("Termination signal received: {}", sig_num);
 		signal(sig_num, SIG_DFL);
 		kill(getpid(), sig_num);
 	}
@@ -121,14 +121,14 @@ void Service::signalTerm(int sig_num) {
 }
 
 void Service::signalHandler(int sig_num) {
-	spdlog::info("Received signal: {}", sig_num);
+	spdlog::critical("Received signal: {}", sig_num);
 	switch (sig_num) {
 		case SIGINT:
 		case SIGTERM:
 			signalTerm(sig_num);
 			break;
 		default:
-			spdlog::warn("Unhandled signal received: {}", sig_num);
+			spdlog::critical("Unhandled signal received: {}", sig_num);
 			auto& service = Service::getInstance();
 			if (service != nullptr) {
 				service->reload();
