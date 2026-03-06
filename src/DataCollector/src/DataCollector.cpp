@@ -20,7 +20,6 @@ namespace DataCollector {
 
 namespace net = boost::asio;
 namespace ssl = boost::asio::ssl;
-using tcp = net::ip::tcp;
 
 namespace {
 
@@ -62,7 +61,7 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 	aggregator_threads.reserve(workers_num);
 	for (std::size_t i = 0; i < workers_num; ++i) {
 		aggregator_threads.emplace_back([&aggregator, &outfile, this]() {
-			aggregateData(aggregator, outfile);
+			aggregateData(outfile, aggregator);
 		});
 	}
 
@@ -89,22 +88,22 @@ void WebSocketClient::runClientSession() noexcept {
 			ssl::context ctx{ssl::context::tls_client};
 			ctx.set_default_verify_paths();
 
-			tcp::resolver resolver{ioc};
+			net::ip::tcp::resolver resolver{ioc};
 			auto const results = resolver.resolve(host, port);
 
 			beast::ssl_stream<beast::tcp_stream> ssl_stream{ioc, ctx};
 			ssl_stream.set_verify_mode(ssl::verify_peer);
-			auto* native = ssl_stream.native_handle();
-			if (!native) {
+			auto native = ssl_stream.native_handle();
+			if (native == nullptr) {
 				spdlog::error("Missing native SSL handle for {}", host);
-				return false;
+				return;
 			}
 
 			if (!SSL_set_tlsext_host_name(native, host.c_str())) {
-				beast::error_code ec{static_cast<int>(::ERR_get_error()),
-				                     net::error::get_ssl_category()};
+				const beast::error_code ec{static_cast<int>(::ERR_get_error()),
+				                           net::error::get_ssl_category()};
 				spdlog::error("SNI setup failed {}: {}", host, ec.message());
-				return false;
+				return;
 			}
 
 			beast::get_lowest_layer(ssl_stream).connect(results);
@@ -125,17 +124,17 @@ void WebSocketClient::runClientSession() noexcept {
 
 			if (!receiveAndStore(ws_stream)) {
 				spdlog::error("WebSocket session ended with errors");
-				return false;
+				return;
 			}
 
 			beast::error_code ec_close;
 			ws_stream.close(websocket::close_code::normal, ec_close);
 			if (ec_close) {
 				spdlog::warn("WebSocket close error: {}", ec_close.message());
-				return false;
+				return;
 			} else {
 				spdlog::info("WebSocket closed successfully");
-				return true;
+				return;
 			}
 		} catch (const std::exception& ex) {
 			spdlog::error("Connection loop exception: {}", ex.what());
@@ -144,7 +143,6 @@ void WebSocketClient::runClientSession() noexcept {
 	std::this_thread::sleep_for(
 	    std::chrono::seconds(m_config.getCheckPeriod()));
 	spdlog::info("WebSocket session ended successfully");
-	return true;
 }
 
 bool WebSocketClient::receiveAndStore(
@@ -165,18 +163,18 @@ bool WebSocketClient::receiveAndStore(
 			spdlog::error("WebSocket read error: {}", ec.message());
 			return false;
 		}
-		std::string message = beast::buffers_to_string(buffer.data());
+		const auto message = beast::buffers_to_string(buffer.data());
 		buffer.consume(buffer.size());
-		m_str_items.bounded_push(std::move(message));
+		m_blk_queue_str_items.bounded_push(std::move(message));
 	}
 	return true;
 }
 
 void WebSocketClient::aggregateData(std::ofstream& out,
-                                    const Aggregator& aggregator) noexcept {
+                                    Aggregator& aggregator) noexcept {
 	while (!m_canceler.isCanceled()) {
 		std::string cur_message;
-		if (!m_str_items.pop(cur_message)) {
+		if (!m_blk_queue_str_items.pop(cur_message)) {
 			spdlog::debug("No message to process, sleeping...");
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
@@ -187,7 +185,9 @@ void WebSocketClient::aggregateData(std::ofstream& out,
 		} else {
 			spdlog::warn("Failed to parse message: {}", cur_message);
 		}
-		aggregator.flushIf(out);
+		if (!aggregator.flushIf(out)) {
+			spdlog::error("Failed to flush aggregator data");
+		}
 	}
 }
 
