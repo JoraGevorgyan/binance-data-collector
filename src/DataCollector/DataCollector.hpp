@@ -36,8 +36,7 @@ public:
 private:
 	const Config::Config& m_config;
 	Canceler::Canceler& m_canceler;
-	boost::lockfree::queue<const std::string*,
-	                       boost::lockfree::capacity<1024>> // 65536
+	boost::lockfree::queue<const std::string*, boost::lockfree::capacity<16384>>
 	    m_blk_queue_str_items;
 
 private:

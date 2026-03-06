@@ -51,7 +51,6 @@ private:
 	const std::chrono::seconds m_flush_period;
 	const std::string m_flush_out_dir;
 	Canceler::Canceler& m_canceler;
-	std::chrono::steady_clock::time_point m_next_flush;
 	std::ofstream m_out;
 	std::unordered_map<std::string, TradeStatistics> m_statistics;
 	std::mutex m_mutex;

@@ -61,11 +61,12 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 	const auto workers_num = validateWorkersNum(m_config.getMaxThreadsNum());
 	std::vector<std::thread> aggregator_threads;
 	aggregator_threads.reserve(workers_num);
+	spdlog::info("Starting {} aggregator worker threads", workers_num);
 	for (std::size_t i = 0; i < workers_num; ++i) {
 		aggregator_threads.emplace_back(
 		    [&aggregator, this]() { aggregateData(aggregator); });
 	}
-
+	spdlog::debug("join other threads");
 	client_session_thread.join();
 	for (auto& aggregator_thread : aggregator_threads) {
 		aggregator_thread.join();
@@ -178,7 +179,10 @@ void WebSocketClient::receiveAndStore(
 }
 
 void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
+	spdlog::debug("Aggregator worker thread started");
+
 	while (!m_canceler.isCanceled()) {
+		spdlog::debug("Aggregator worker thread in loop");
 		const std::string* cur_message_ptr = nullptr;
 		if (!m_blk_queue_str_items.pop(cur_message_ptr) ||
 		    cur_message_ptr == nullptr) {
@@ -188,9 +192,10 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 		}
 		const auto trade_event_opt =
 		    Aggregator::parseTradeEvent(*cur_message_ptr);
+
 		if (trade_event_opt.has_value()) {
+			spdlog::debug("update stats");
 			aggregator.update(trade_event_opt.value());
-			spdlog::debug("updated stats");
 		} else {
 			spdlog::warn("Failed to parse message: {}", *cur_message_ptr);
 		}
@@ -199,6 +204,7 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 }
 
 void WebSocketClient::clearQueue() noexcept {
+	spdlog::debug("Clearing message queue");
 	const std::string* cur_message_ptr = nullptr;
 	while (m_blk_queue_str_items.pop(cur_message_ptr)) {
 		delete cur_message_ptr;

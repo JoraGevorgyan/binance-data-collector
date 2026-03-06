@@ -47,8 +47,7 @@ Aggregator::Aggregator(std::chrono::seconds flush_period,
                        Canceler::Canceler& canceler)
     : m_flush_period(flush_period),
       m_flush_out_dir(std::move(output_dir)),
-      m_canceler(canceler),
-      m_next_flush(std::chrono::steady_clock::now() + flush_period) {}
+      m_canceler(canceler) {}
 
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {
@@ -121,6 +120,7 @@ bool Aggregator::isStreamAvailable() noexcept {
 }
 
 bool Aggregator::writeSnapshotSync() noexcept {
+	const std::unique_lock<std::mutex> lock(m_mutex);
 	if (!isStreamAvailable()) {
 		spdlog::critical("cannot dump statistics to a file");
 		return false;
@@ -149,24 +149,22 @@ std::thread Aggregator::startFlushWorker() noexcept {
 }
 
 void Aggregator::flushWorker() noexcept {
+	auto next_flush = std::chrono::steady_clock::now();
 	while (!m_canceler.isCanceled()) {
-		auto now = std::chrono::steady_clock::now();
-		const std::unique_lock<std::mutex> lock(m_mutex);
-		if (now > m_next_flush) {
-			if (!writeSnapshotSync()) {
-				spdlog::error("Failed to write snapshot");
-			} else {
-				spdlog::info("Snapshot flushed successfully");
-			}
-		} else {
-			std::this_thread::yield();
-			const auto dur =
-			    std::chrono::duration_cast<std::chrono::milliseconds>(
-			        m_next_flush - now);
-			std::this_thread::sleep_for(dur);
+		spdlog::info("flush worker thread in progress");
+		next_flush += m_flush_period;
+		std::this_thread::sleep_until(next_flush);
+		if (m_canceler.isCanceled()) {
+			break;
 		}
-		m_next_flush = now + m_flush_period;
+
+		if (!writeSnapshotSync()) {
+			spdlog::error("Failed to write snapshot");
+		} else {
+			spdlog::info("Snapshot flushed successfully");
+		}
 	}
+	spdlog::info("flush worker thread woke up");
 }
 
 } // namespace DataCollector
