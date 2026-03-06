@@ -81,73 +81,72 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 void WebSocketClient::runClientSession() noexcept {
 	const auto host = m_config.getHostName();
 	const auto port = m_config.getPort();
-	spdlog::info("Connecting to WebSocket at {}:{}", host, port);
-
 	const auto target = makeStreamPath(m_config.getStreamsList());
+
+	spdlog::info("Connecting to WebSocket at {}:{}", host, port);
+	auto interval = m_config.getConnectPeriod();
 	while (!m_canceler.isCanceled()) {
-		try {
-			net::io_context ioc;
-			ssl::context ctx{ssl::context::tls_client};
-			ctx.set_default_verify_paths();
-
-			net::ip::tcp::resolver resolver{ioc};
-			auto const results = resolver.resolve(host, port);
-
-			beast::ssl_stream<beast::tcp_stream> ssl_stream{ioc, ctx};
-			ssl_stream.set_verify_mode(ssl::verify_peer);
-			auto native = ssl_stream.native_handle();
-			if (native == nullptr) {
-				spdlog::error("Missing native SSL handle for {}", host);
-				return;
-			}
-
-			if (!SSL_set_tlsext_host_name(native, host.c_str())) {
-				const beast::error_code ec{static_cast<int>(::ERR_get_error()),
-				                           net::error::get_ssl_category()};
-				spdlog::error("SNI setup failed {}: {}", host, ec.message());
-				return;
-			}
-
-			beast::get_lowest_layer(ssl_stream).connect(results);
-			ssl_stream.handshake(ssl::stream_base::client);
-
-			websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws_stream{
-			    std::move(ssl_stream)};
-			ws_stream.set_option(websocket::stream_base::timeout::suggested(
-			    boost::beast::role_type::client));
-			ws_stream.set_option(websocket::stream_base::decorator(
-			    [](websocket::request_type& req) {
-				    req.set(http::field::user_agent,
-				            std::string("binance-ws-sample"));
-			    }));
-
-			ws_stream.handshake(host, target);
-			spdlog::info("Connected to {}{}", host, target);
-
-			if (!receiveAndStore(ws_stream)) {
-				spdlog::error("WebSocket session ended with errors");
-				return;
-			}
-
-			beast::error_code ec_close;
-			ws_stream.close(websocket::close_code::normal, ec_close);
-			if (ec_close) {
-				spdlog::warn("WebSocket close error: {}", ec_close.message());
-				return;
-			} else {
-				spdlog::info("WebSocket closed successfully");
-				return;
-			}
-		} catch (const std::exception& ex) {
-			spdlog::error("Connection loop exception: {}", ex.what());
+		if (interval >= m_config.getConnectPeriod()) {
+			runClientSessionImpl(host, port, target);
+			interval = std::chrono::seconds(0);
 		}
+		std::this_thread::sleep_for(m_config.getCheckPeriod());
+		interval += m_config.getCheckPeriod();
 	}
-	std::this_thread::sleep_for(
-	    std::chrono::seconds(m_config.getCheckPeriod()));
-	spdlog::info("WebSocket session ended successfully");
+	spdlog::info("WebSocket session ended");
 }
 
-bool WebSocketClient::receiveAndStore(
+void WebSocketClient::runClientSessionImpl(const std::string& host,
+                                           const std::string& port,
+                                           const std::string& target) noexcept {
+	try {
+		net::io_context ioc;
+		ssl::context ctx{ssl::context::tls_client};
+		ctx.set_default_verify_paths();
+
+		net::ip::tcp::resolver resolver{ioc};
+		auto const results = resolver.resolve(host, port);
+
+		beast::ssl_stream<beast::tcp_stream> ssl_stream{ioc, ctx};
+		ssl_stream.set_verify_mode(ssl::verify_peer);
+		auto native = ssl_stream.native_handle();
+		if (native == nullptr) {
+			spdlog::error("Missing native SSL handle for {}", host);
+			return;
+		}
+
+		if (!SSL_set_tlsext_host_name(native, host.c_str())) {
+			const beast::error_code ec{static_cast<int>(::ERR_get_error()),
+			                           net::error::get_ssl_category()};
+			spdlog::error("SNI setup failed {}: {}", host, ec.message());
+			return;
+		}
+
+		beast::get_lowest_layer(ssl_stream).connect(results);
+		ssl_stream.handshake(ssl::stream_base::client);
+
+		websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws_stream{
+		    std::move(ssl_stream)};
+		ws_stream.set_option(websocket::stream_base::timeout::suggested(
+		    boost::beast::role_type::client));
+		ws_stream.set_option(
+		    websocket::stream_base::decorator([](websocket::request_type& req) {
+			    req.set(http::field::user_agent,
+			            std::string("binance-ws-sample"));
+		    }));
+
+		ws_stream.handshake(host, target);
+		spdlog::info("Connected to {}{}", host, target);
+
+		receiveAndStore(ws_stream);
+		beast::error_code ec_close;
+		ws_stream.close(websocket::close_code::normal, ec_close);
+	} catch (const std::exception& ex) {
+		spdlog::error("Connection loop exception: {}", ex.what());
+	}
+}
+
+void WebSocketClient::receiveAndStore(
     websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream) {
 	const auto reconnection_delay = m_config.getReconnectionDelay();
 	const auto timer = std::chrono::steady_clock::now();
@@ -156,32 +155,28 @@ bool WebSocketClient::receiveAndStore(
 			spdlog::warn("Reconnection delay of {} minutes exceeded.",
 			             reconnection_delay.count());
 			spdlog::warn("Stopping session to reconnect...");
-			return true;
+			return;
 		}
 		beast::flat_buffer buffer;
 		beast::error_code ec;
 		ws_stream.read(buffer, ec);
 		if (ec) {
 			spdlog::error("WebSocket read error: {}", ec.message());
-			return false;
+			return;
 		}
 		const auto message = beast::buffers_to_string(buffer.data());
 		const std::string* msg_ptr = new (std::nothrow) std::string(message);
 		if (msg_ptr == nullptr) {
 			spdlog::error("Failed to allocate memory for message copy");
-			std::this_thread::yield();
-			std::this_thread::sleep_for(std::chrono::milliseconds(200));
-			continue;
+			return;
 		}
 		spdlog::debug("Received message: {}", message);
 		if (!m_blk_queue_str_items.bounded_push(msg_ptr)) {
 			delete msg_ptr;
-			spdlog::warn("Failed to push message to queue");
-			std::this_thread::yield();
-			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			spdlog::critical("loss of data, queue is full...");
+			return;
 		}
 	}
-	return true;
 }
 
 void WebSocketClient::aggregateData(std::ofstream& out,

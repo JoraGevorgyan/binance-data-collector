@@ -36,12 +36,16 @@ public:
 private:
 	const Config::Config& m_config;
 	Canceler::Canceler& m_canceler;
-	boost::lockfree::queue<const std::string*, boost::lockfree::capacity<1024>>
+	boost::lockfree::queue<const std::string*,
+	                       boost::lockfree::capacity<1024>> // 65536
 	    m_blk_queue_str_items;
 
 private:
 	void runClientSession() noexcept;
-	bool receiveAndStore(
+	void runClientSessionImpl(const std::string& host,
+	                          const std::string& port,
+	                          const std::string& target) noexcept;
+	void receiveAndStore(
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
 	void aggregateData(std::ofstream& out, Aggregator& aggregator) noexcept;
 	void clearQueue() noexcept;
