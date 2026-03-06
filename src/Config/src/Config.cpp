@@ -99,10 +99,11 @@ bool Config::init(int argc, char* argv[]) noexcept {
 }
 
 bool Config::initLogger() const noexcept {
-	try {
+	try { // need to refactor
 		auto log_level = getLogLevel();
 		if (isDebugMode()) {
 			log_level = spdlog::level::debug;
+			spdlog::set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
 			spdlog::set_level(log_level);
 			return true;
 		}
@@ -139,7 +140,7 @@ bool Config::updateConfig() noexcept {
 		m_connect_period = std::chrono::seconds(60);
 		m_check_period = std::chrono::seconds(10);
 
-		m_max_retries_num = 100;
+		m_max_retries_num = 10;
 		m_reconnection_delay = std::chrono::minutes(20 * 60);
 		m_stats_flush_period = std::chrono::seconds(40);
 		m_stats_output_path = g_def_stats_out_path_c;
