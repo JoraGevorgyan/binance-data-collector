@@ -13,31 +13,6 @@ namespace DataCollector {
 
 namespace {
 
-struct TradeStatistics {
-	uint64_t trades{0};
-	double volume{0.0};
-	double min_price{std::numeric_limits<double>::max()};
-	double max_price{std::numeric_limits<double>::lowest()};
-	uint64_t buy_count{0};
-	uint64_t sell_count{0};
-
-	void reset() {
-		trades = 0;
-		volume = 0.0;
-		min_price = std::numeric_limits<double>::max();
-		max_price = std::numeric_limits<double>::lowest();
-		buy_count = 0;
-		sell_count = 0;
-	}
-};
-
-struct TradeEvent {
-	std::string symbol;
-	double price{0.0};
-	double quantity{0.0};
-	bool is_buyer_or_maker{true};
-};
-
 std::string formatTimestamp(
     std::chrono::system_clock::time_point t_point) noexcept {
 	const auto to_time = std::chrono::system_clock::to_time_t(t_point);

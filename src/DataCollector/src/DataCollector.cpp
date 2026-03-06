@@ -72,8 +72,10 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 
 	if (!aggregator.forceFlush(outfile)) {
 		spdlog::warn("force flush failed.");
+		return false;
 	}
 	spdlog::info("Shutdown complete");
+	return true;
 }
 
 void WebSocketClient::runClientSession() noexcept {
@@ -165,7 +167,12 @@ bool WebSocketClient::receiveAndStore(
 		}
 		const auto message = beast::buffers_to_string(buffer.data());
 		buffer.consume(buffer.size());
-		m_blk_queue_str_items.bounded_push(std::move(message));
+		if (!m_blk_queue_str_items.bounded_push(
+		        std::string_view(message.data(), message.size()))) {
+			spdlog::warn("Failed to push message to queue");
+			std::this_thread::yield();
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		}
 	}
 	return true;
 }

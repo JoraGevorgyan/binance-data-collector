@@ -34,7 +34,7 @@ public:
 private:
 	const Config::Config& m_config;
 	Canceler::Canceler& m_canceler;
-	boost::lockfree::queue<std::string> m_str_items{1024}; // can be configured
+	boost::lockfree::queue<std::string_view> m_blk_queue_str_items{1024};
 
 private:
 	void runClientSession() noexcept;

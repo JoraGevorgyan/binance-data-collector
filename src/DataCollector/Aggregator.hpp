@@ -8,12 +8,30 @@
 
 namespace DataCollector {
 
-namespace {
+struct TradeStatistics {
+	uint64_t trades{0};
+	double volume{0.0};
+	double min_price{std::numeric_limits<double>::max()};
+	double max_price{std::numeric_limits<double>::lowest()};
+	uint64_t buy_count{0};
+	uint64_t sell_count{0};
 
-struct TradeStatistics;
-struct TradeEvent;
+	void reset() {
+		trades = 0;
+		volume = 0.0;
+		min_price = std::numeric_limits<double>::max();
+		max_price = std::numeric_limits<double>::lowest();
+		buy_count = 0;
+		sell_count = 0;
+	}
+};
 
-} // namespace
+struct TradeEvent {
+	std::string symbol;
+	double price{0.0};
+	double quantity{0.0};
+	bool is_buyer_or_maker{true};
+};
 
 class Aggregator {
 public:
