@@ -56,7 +56,7 @@ void ServiceDataCollector::doMainWork() noexcept {
 		spdlog::info("Service {} is working...", m_display_name.c_str());
 
 		if (interval >= m_config.getConnectPeriod()) {
-			DataCollector::BinanceWebSocketClient client(m_config, m_canceler);
+			DataCollector::WebSocketClient client(m_config, m_canceler);
 			if (!client.runWebSocketSession()) {
 				m_exit_code = EXIT_FAILURE;
 				if (++retries >= max_retries) {
