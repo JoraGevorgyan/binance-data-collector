@@ -187,6 +187,10 @@ std::chrono::seconds Config::getStatsFlushPeriod() const noexcept {
 	return m_stats_flush_period;
 }
 
+std::chrono::minutes Config::getReconnectionDelay() const noexcept {
+	return m_reconnection_delay;
+}
+
 std::string Config::getStatsOutputPath() const noexcept {
 	return m_stats_output_path;
 }
