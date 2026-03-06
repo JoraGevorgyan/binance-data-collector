@@ -30,9 +30,10 @@ public:
 	std::size_t getMaxRetriesNum() const noexcept;
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
 	std::string getStatsOutputPath() const noexcept;
-	std::vector<std::string> getSymbols() const noexcept;
 	std::size_t getMaxThreadsNum() const noexcept;
-	std::vector<std::string> getStreams() const noexcept;
+	std::vector<std::string> getStreamsList() const noexcept;
+	std::string getHostName() const noexcept;
+	std::string getPort() const noexcept;
 
 private:
 	static std::unique_ptr<Config> m_instance;
@@ -45,9 +46,10 @@ private:
 	std::size_t m_max_retries_num;
 	std::chrono::seconds m_stats_flush_period;
 	std::string m_stats_output_path;
-	std::vector<std::string> m_symbols;
 	std::size_t m_max_threads_num;
-	std::vector<std::string> m_streams;
+	std::vector<std::string> m_streams_list;
+	std::string m_host_name;
+	std::string m_port;
 
 private:
 	spdlog::level::level_enum getLogLevel() const noexcept;

@@ -21,8 +21,7 @@ constexpr auto g_service_name_c = "binance-data-collector-service";
 constexpr auto g_service_display_name_c = "Binance Data Collector Service";
 // TODO: add working dir in future and save all files there
 constexpr auto g_def_stats_out_path_c =
-    "/var/log/binance-data-collector/stats.log";
-const std::vector<std::string> g_def_stats_c = {"BTCUSDT", "ETHUSDT"};
+    "/var/log/binance-data-collector/statistics.log";
 
 std::string getLogPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::log_path].as<std::string>();
@@ -142,8 +141,9 @@ bool Config::updateConfig() noexcept {
 		m_stats_flush_period = std::chrono::seconds(40);
 		m_stats_output_path = g_def_stats_out_path_c;
 		m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
-		m_symbols = g_def_stats_c;
-		m_streams = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
+		m_streams_list = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
+		m_host_name = "stream.binance.com";
+		m_port = "9443";
 	} catch (const std::exception& err) {
 		std::cerr << "Error updating config: " << err.what() << std::endl;
 		return false;
@@ -190,16 +190,20 @@ std::string Config::getStatsOutputPath() const noexcept {
 	return m_stats_output_path;
 }
 
-std::vector<std::string> Config::getSymbols() const noexcept {
-	return m_symbols;
-}
-
 std::size_t Config::getMaxThreadsNum() const noexcept {
 	return m_max_threads_num;
 }
 
-std::vector<std::string> Config::getStreams() const noexcept {
-	return m_streams;
+std::vector<std::string> Config::getStreamsList() const noexcept {
+	return m_streams_list;
+}
+
+std::string Config::getHostName() const noexcept {
+	return m_host_name;
+}
+
+std::string Config::getPort() const noexcept {
+	return m_port;
 }
 
 } // namespace Config
