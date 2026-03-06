@@ -103,6 +103,8 @@ bool Config::initLogger() const noexcept {
 		auto log_level = getLogLevel();
 		if (isDebugMode()) {
 			log_level = spdlog::level::debug;
+			spdlog::set_level(log_level);
+			return true;
 		}
 
 		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
