@@ -111,7 +111,8 @@ bool Aggregator::flushIf(std::ofstream& out) noexcept {
 	const auto now = std::chrono::steady_clock::now();
 	const std::unique_lock<std::mutex> lock(m_mutex);
 	if (now < m_next_flush) {
-		return false;
+		spdlog::debug("Flush not needed yet.");
+		return true;
 	}
 	m_next_flush = now + m_flush_period;
 
