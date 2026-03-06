@@ -3,6 +3,7 @@
 #include <fstream>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 
 namespace DataCollector {
@@ -20,10 +21,7 @@ public:
 
 	[[nodiscard]] static std::optional<TradeEvent> parseTradeEvent(
 	    const std::string& message) noexcept;
-	[[nodiscard]] bool update(const std::string& symbol,
-	                          double price,
-	                          double quantity,
-	                          bool is_buyer_maker) noexcept;
+	void update(const TradeEvent& event_msg) noexcept;
 	[[nodiscard]] bool flushIf(std::ofstream& out) noexcept;
 	[[nodiscard]] bool forceFlush(std::ofstream& out) noexcept;
 

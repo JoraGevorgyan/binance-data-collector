@@ -5,10 +5,7 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl.hpp>
-#include <boost/beast/core.hpp>
 #include <boost/beast/ssl.hpp>
-#include <boost/beast/websocket.hpp>
-#include <boost/lockfree/queue.hpp>
 
 #include <openssl/err.h>
 #include <algorithm>
@@ -21,9 +18,6 @@
 
 namespace DataCollector {
 
-namespace beast = boost::beast;
-namespace http = beast::http;
-namespace websocket = beast::websocket;
 namespace net = boost::asio;
 namespace ssl = boost::asio::ssl;
 using tcp = net::ip::tcp;
@@ -77,7 +71,9 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 		aggregator_thread.join();
 	}
 
-	aggregator.forceFlush(outfile);
+	if (!aggregator.forceFlush(outfile)) {
+		spdlog::warn("force flush failed.");
+	}
 	spdlog::info("Shutdown complete");
 }
 
@@ -174,23 +170,6 @@ bool WebSocketClient::receiveAndStore(
 		m_str_items.bounded_push(std::move(message));
 	}
 	return true;
-}
-
-void processing_thread(BlockingQueue<std::string>& queue,
-                       Aggregator& agg,
-                       std::ofstream& out) {
-	TradeEvent event;
-	while (g_running.load()) {
-		std::string msg;
-		if (!queue.wait_pop(msg, g_running)) {
-			break;
-		}
-		if (parse_trade_event(msg, event)) {
-			agg.update(event.symbol, event.price, event.quantity,
-			           event.is_buyer_maker);
-			agg.flush_if_due(out);
-		}
-	}
 }
 
 void WebSocketClient::aggregateData(std::ofstream& out,

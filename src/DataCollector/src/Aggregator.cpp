@@ -38,9 +38,10 @@ struct TradeEvent {
 	bool is_buyer_or_maker{true};
 };
 
-std::string formatTimestamp(std::chrono::system_clock::time_point tp) noexcept {
-	std::time_t tt = std::chrono::system_clock::to_time_t(tp);
-	std::tm tm = *std::gmtime(&tt);
+std::string formatTimestamp(
+    std::chrono::system_clock::time_point t_point) noexcept {
+	const auto to_time = std::chrono::system_clock::to_time_t(t_point);
+	const auto tm = *std::gmtime(&to_time);
 	std::ostringstream oss;
 	oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
 	return oss.str();
@@ -55,20 +56,19 @@ Aggregator::Aggregator(std::chrono::seconds flush_period)
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {
 	{
-		using json = nlohmann::json;
 		TradeEvent result;
-		json j = json::parse(message, nullptr, false);
-		if (j.is_discarded()) {
+		nlohmann::json js_obj = nlohmann::json::parse(message, nullptr, false);
+		if (js_obj.is_discarded()) {
 			spdlog::warn("Discarded malformed JSON");
 			return std::nullopt;
 		}
 
-		if (!j.contains("data") || !j["data"].is_object()) {
+		if (!js_obj.contains("data") || !js_obj["data"].is_object()) {
 			spdlog::warn("Missing data field");
 			return std::nullopt;
 		}
 
-		const auto& d = j["data"];
+		const auto& d = js_obj["data"];
 		if (!d.contains("s") || !d.contains("p") || !d.contains("q") ||
 		    !d.contains("m")) {
 			spdlog::warn("Missing required trade fields");
@@ -79,71 +79,72 @@ std::optional<TradeEvent> Aggregator::parseTradeEvent(
 			result.symbol = d.value("s", "");
 			result.price = std::stod(d.value("p", "0"));
 			result.quantity = std::stod(d.value("q", "0"));
-			result.is_buyer_maker = d.value("m", true);
+			result.is_buyer_or_maker = d.value("m", true);
 			return result;
 		} catch (const std::exception& ex) {
 			spdlog::warn("Trade parse error: {}", ex.what());
 			return std::nullopt;
 		}
 	}
+}
 
-	bool Aggregator::update(const std::string& symbol, double price,
-	                        double quantity, bool is_buyer_or_maker) {
-		std::lock_guard<std::mutex> lock(m_mutex);
-		TradeStatistics& stats = m_statistics[symbol];
-		stats.trades += 1;
-		stats.volume += price * quantity;
-		stats.min_price = std::min(stats.min_price, price);
-		stats.max_price = std::max(stats.max_price, price);
-		if (is_buyer_or_maker) {
-			stats.sell_count += 1; // seller-initiated
-		} else {
-			stats.buy_count += 1; // buyer-initiated
-		}
+void Aggregator::update(const TradeEvent& event_msg) noexcept {
+	const std::lock_guard<std::mutex> lock(m_mutex);
+
+	TradeStatistics& stats = m_statistics[event_msg.symbol];
+	stats.trades += 1;
+	stats.volume += event_msg.price * event_msg.quantity;
+	stats.min_price = std::min(stats.min_price, event_msg.price);
+	stats.max_price = std::max(stats.max_price, event_msg.price);
+	if (event_msg.is_buyer_or_maker) {
+		stats.sell_count += 1; // seller-initiated
+	} else {
+		stats.buy_count += 1; // buyer-initiated
+	}
+}
+
+bool Aggregator::writeSnapshotSync(
+    std::ofstream& out,
+    std::chrono::system_clock::time_point wall_clock) noexcept {
+	if (!out) {
+		spdlog::error("Output stream is not open");
+		return false;
 	}
 
-	bool Aggregator::writeSnapshotSync(
-	    std::ofstream & out,
-	    std::chrono::system_clock::time_point wall_clock) noexcept {
-		if (!out) {
-			spdlog::error("Output stream is not open");
-			return false;
+	const auto timestamp = formatTimestamp(wall_clock);
+	out << "timestamp=" << timestamp << '\n';
+
+	for (auto& entry : m_statistics) {
+		const std::string& symbol = entry.first;
+		TradeStatistics& tmp_s = entry.second;
+		if (tmp_s.trades == 0) {
+			continue;
 		}
-
-		const auto timestamp = formatTimestamp(wall_clock);
-		out << "timestamp=" << timestamp << '\n';
-
-		for (auto& entry : m_statistics) {
-			const std::string& symbol = entry.first;
-			TradeStatistics& tmp_s = entry.second;
-			if (tmp_s.trades == 0) {
-				continue;
-			}
-			out << "symbol=" << symbol << " trades=" << tmp_s.trades
-			    << " volume=" << tmp_s.volume << " min=" << tmp_s.min_price
-			    << " max=" << tmp_s.max_price << " buy=" << tmp_s.buy_count
-			    << " sell=" << tmp_s.sell_count << '\n';
-			tmp_s.reset();
-		}
-		out.flush();
-		return true;
+		out << "symbol=" << symbol << " trades=" << tmp_s.trades
+		    << " volume=" << tmp_s.volume << " min=" << tmp_s.min_price
+		    << " max=" << tmp_s.max_price << " buy=" << tmp_s.buy_count
+		    << " sell=" << tmp_s.sell_count << '\n';
+		tmp_s.reset();
 	}
+	out.flush();
+	return true;
+}
 
-	bool Aggregator::flushIf(std::ofstream & out) {
-		const auto now = std::chrono::steady_clock::now();
-		const std::unique_lock<std::mutex> lock(m_mutex);
-		if (now < m_next_flush) {
-			return false;
-		}
-		m_next_flush = now + m_flush_period;
-
-		const auto wall_clock = std::chrono::system_clock::now();
-		return writeSnapshotSync(out, wall_clock);
+bool Aggregator::flushIf(std::ofstream& out) noexcept {
+	const auto now = std::chrono::steady_clock::now();
+	const std::unique_lock<std::mutex> lock(m_mutex);
+	if (now < m_next_flush) {
+		return false;
 	}
+	m_next_flush = now + m_flush_period;
 
-	bool Aggregator::forceFlush(std::ofstream & out) {
-		const std::lock_guard<std::mutex> lock(m_mutex);
-		return writeSnapshotSync(out, std::chrono::system_clock::now());
-	}
+	const auto wall_clock = std::chrono::system_clock::now();
+	return writeSnapshotSync(out, wall_clock);
+}
+
+bool Aggregator::forceFlush(std::ofstream& out) noexcept {
+	const std::lock_guard<std::mutex> lock(m_mutex);
+	return writeSnapshotSync(out, std::chrono::system_clock::now());
+}
 
 } // namespace DataCollector

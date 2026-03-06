@@ -1,8 +1,18 @@
 #pragma once
-#include "Config/Config.hpp"
+#include "Aggregator.hpp"
 #include "common/Canceler.hpp"
+#include "Config/Config.hpp"
+
+#include <boost/beast/core.hpp>
+#include <boost/beast/websocket.hpp>
+#include <boost/lockfree/queue.hpp>
+#include <boost/algorithm/string.hpp>
 
 namespace DataCollector {
+
+namespace beast = boost::beast;
+namespace http = beast::http;
+namespace websocket = beast::websocket;
 
 class WebSocketClient {
 public:
