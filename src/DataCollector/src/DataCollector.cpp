@@ -124,6 +124,8 @@ bool WebSocketClient::runClient() noexcept {
 			spdlog::error("Connection loop exception: {}", ex.what());
 		}
 	}
+	std::this_thread::sleep_for(
+				std::chrono::seconds(m_config.getCheckPeriod()));
 	spdlog::info("WebSocket session ended successfully");
 	return true;
 }
