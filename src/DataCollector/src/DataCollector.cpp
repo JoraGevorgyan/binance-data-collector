@@ -1,6 +1,5 @@
 #include "../DataCollector.hpp"
 #include "../Aggregator.hpp"
-#include "nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 
 #include <boost/asio/connect.hpp>
@@ -28,7 +27,6 @@ namespace websocket = beast::websocket;
 namespace net = boost::asio;
 namespace ssl = boost::asio::ssl;
 using tcp = net::ip::tcp;
-using json = nlohmann::json;
 
 namespace {
 
@@ -43,6 +41,15 @@ std::string makeStreamPath(const std::vector<std::string>& streams) noexcept {
 	return path;
 }
 
+std::size_t validateWorkersNum(std::size_t num) noexcept {
+	constexpr int busy_workers = 2;
+	if (num <= busy_workers) {
+		spdlog::warn("Max threads num {} is too low.");
+		return 1;
+	}
+	return num - busy_workers;
+}
+
 } // namespace
 
 WebSocketClient::WebSocketClient(const Config::Config& config,
@@ -51,16 +58,30 @@ WebSocketClient::WebSocketClient(const Config::Config& config,
 
 bool WebSocketClient::runWebSocketSession() noexcept {
 	spdlog::info("Trying to create a session");
-	if (!runClient()) {
-		spdlog::error("Failed to run WebSocket client");
-		return false;
-	}
+	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
 
 	DataCollector::Aggregator aggregator(m_config.getStatsFlushPeriod());
-	std::ofstream outfile("binance_stats.log", std::ios::app);
+	std::ofstream outfile(m_config.getStatsOutputPath(), std::ios::app);
+
+	const auto workers_num = validateWorkersNum(m_config.getMaxThreadsNum());
+	std::vector<std::thread> aggregator_threads;
+	aggregator_threads.reserve(workers_num);
+	for (std::size_t i = 0; i < workers_num; ++i) {
+		aggregator_threads.emplace_back([&aggregator, &outfile, this]() {
+			aggregateData(aggregator, outfile);
+		});
+	}
+
+	client_session_thread.join();
+	for (auto& aggregator_thread : aggregator_threads) {
+		aggregator_thread.join();
+	}
+
+	aggregator.forceFlush(outfile);
+	spdlog::info("Shutdown complete");
 }
 
-bool WebSocketClient::runClient() noexcept {
+void WebSocketClient::runClientSession() noexcept {
 	const auto host = m_config.getHostName();
 	const auto port = m_config.getPort();
 	spdlog::info("Connecting to WebSocket at {}:{}", host, port);
@@ -125,7 +146,7 @@ bool WebSocketClient::runClient() noexcept {
 		}
 	}
 	std::this_thread::sleep_for(
-				std::chrono::seconds(m_config.getCheckPeriod()));
+	    std::chrono::seconds(m_config.getCheckPeriod()));
 	spdlog::info("WebSocket session ended successfully");
 	return true;
 }
@@ -153,6 +174,42 @@ bool WebSocketClient::receiveAndStore(
 		m_str_items.bounded_push(std::move(message));
 	}
 	return true;
+}
+
+void processing_thread(BlockingQueue<std::string>& queue,
+                       Aggregator& agg,
+                       std::ofstream& out) {
+	TradeEvent event;
+	while (g_running.load()) {
+		std::string msg;
+		if (!queue.wait_pop(msg, g_running)) {
+			break;
+		}
+		if (parse_trade_event(msg, event)) {
+			agg.update(event.symbol, event.price, event.quantity,
+			           event.is_buyer_maker);
+			agg.flush_if_due(out);
+		}
+	}
+}
+
+void WebSocketClient::aggregateData(std::ofstream& out,
+                                    const Aggregator& aggregator) noexcept {
+	while (!m_canceler.isCanceled()) {
+		std::string cur_message;
+		if (!m_str_items.pop(cur_message)) {
+			spdlog::debug("No message to process, sleeping...");
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue;
+		}
+		const auto trade_event_opt = Aggregator::parseTradeEvent(cur_message);
+		if (trade_event_opt.has_value()) {
+			aggregator.update(trade_event_opt.value());
+		} else {
+			spdlog::warn("Failed to parse message: {}", cur_message);
+		}
+		aggregator.flushIf(out);
+	}
 }
 
 } // namespace DataCollector

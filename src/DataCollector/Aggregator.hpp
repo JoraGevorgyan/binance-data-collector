@@ -10,6 +10,7 @@ namespace DataCollector {
 namespace {
 
 struct TradeStatistics;
+struct TradeEvent;
 
 } // namespace
 
@@ -17,6 +18,8 @@ class Aggregator {
 public:
 	explicit Aggregator(std::chrono::seconds flush_period);
 
+	[[nodiscard]] static std::optional<TradeEvent> parseTradeEvent(
+	    const std::string& message) noexcept;
 	[[nodiscard]] bool update(const std::string& symbol,
 	                          double price,
 	                          double quantity,

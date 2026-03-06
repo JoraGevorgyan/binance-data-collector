@@ -20,9 +20,11 @@ private:
 	boost::lockfree::queue<std::string> m_str_items{1024}; // can be configured
 
 private:
-	bool runClient() noexcept;
+	void runClientSession() noexcept;
 	bool receiveAndStore(
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
+	void aggregateData(std::ofstream& out,
+	                   const Aggregator& aggregator) noexcept;
 };
 
 } // namespace DataCollector
