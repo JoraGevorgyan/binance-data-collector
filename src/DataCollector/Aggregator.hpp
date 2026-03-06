@@ -55,10 +55,12 @@ private:
 	std::ofstream m_out;
 	std::unordered_map<std::string, TradeStatistics> m_statistics;
 	std::mutex m_mutex;
+	static std::size_t m_next_stats_file;
 
 private:
 	bool writeSnapshotSync() noexcept;
 	void flushWorker() noexcept;
+	bool isStreamAvailable() noexcept;
 };
 
 } // namespace DataCollector

@@ -1,5 +1,6 @@
 #include "../Aggregator.hpp"
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -20,6 +21,23 @@ std::string formatTimestamp(
 	std::ostringstream oss;
 	oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
 	return oss.str();
+}
+
+std::optional<std::filesystem::path> getValidFullPath(
+    const std::string& dir,
+    const std::string& f_name) noexcept {
+	namespace fs = std::filesystem;
+	std::error_code err_c;
+	const fs::path base_path(dir);
+
+	if (!fs::exists(base_path, err_c)) {
+		if (!fs::create_directories(base_path, err_c) && err_c) {
+			spdlog::error("Failed to create directory {}: {}",
+			              base_path.string(), err_c.message());
+			return std::nullopt;
+		}
+	}
+	return base_path / f_name;
 }
 
 } // namespace
@@ -84,12 +102,29 @@ void Aggregator::update(const TradeEvent& event_msg) noexcept {
 	}
 }
 
-bool Aggregator::writeSnapshotSync() noexcept {
-	if (!m_out) {
-		spdlog::error("Output stream is not open");
+std::size_t Aggregator::m_next_stats_file = 1;
+
+bool Aggregator::isStreamAvailable() noexcept {
+	if (m_out.is_open()) {
+		return true;
+	}
+	// TODO: check currenttly open file size, and if needed create a new one
+	const auto n_name = std::to_string(m_next_stats_file) + "_statistics.log";
+	++m_next_stats_file;
+	if (m_next_stats_file >= 1000) { // configure
+		spdlog::critical("Too many stats files, cannot create new one");
 		return false;
 	}
+	const auto full_path = getValidFullPath(m_flush_out_dir, n_name);
+	m_out.open(full_path.value_or(n_name), std::ios::out | std::ios::app);
+	return m_out.is_open();
+}
 
+bool Aggregator::writeSnapshotSync() noexcept {
+	if (!isStreamAvailable()) {
+		spdlog::critical("cannot dump statistics to a file");
+		return false;
+	}
 	const auto timestamp = formatTimestamp(std::chrono::system_clock::now());
 	m_out << "timestamp=" << timestamp << '\n';
 
