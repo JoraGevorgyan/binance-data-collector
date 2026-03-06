@@ -24,8 +24,12 @@ std::string formatTimestamp(
 
 } // namespace
 
-Aggregator::Aggregator(std::chrono::seconds flush_period)
+Aggregator::Aggregator(std::chrono::seconds flush_period,
+                       std::string output_dir,
+                       Canceler::Canceler& canceler)
     : m_flush_period(flush_period),
+      m_flush_out_dir(std::move(output_dir)),
+      m_canceler(canceler),
       m_next_flush(std::chrono::steady_clock::now() + flush_period) {}
 
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
@@ -80,16 +84,14 @@ void Aggregator::update(const TradeEvent& event_msg) noexcept {
 	}
 }
 
-bool Aggregator::writeSnapshotSync(
-    std::ofstream& out,
-    std::chrono::system_clock::time_point wall_clock) noexcept {
-	if (!out) {
+bool Aggregator::writeSnapshotSync() noexcept {
+	if (!m_out) {
 		spdlog::error("Output stream is not open");
 		return false;
 	}
 
-	const auto timestamp = formatTimestamp(wall_clock);
-	out << "timestamp=" << timestamp << '\n';
+	const auto timestamp = formatTimestamp(std::chrono::system_clock::now());
+	m_out << "timestamp=" << timestamp << '\n';
 
 	for (auto& entry : m_statistics) {
 		const std::string& symbol = entry.first;
@@ -97,32 +99,39 @@ bool Aggregator::writeSnapshotSync(
 		if (tmp_s.trades == 0) {
 			continue;
 		}
-		out << "symbol=" << symbol << " trades=" << tmp_s.trades
-		    << " volume=" << tmp_s.volume << " min=" << tmp_s.min_price
-		    << " max=" << tmp_s.max_price << " buy=" << tmp_s.buy_count
-		    << " sell=" << tmp_s.sell_count << '\n';
+		m_out << "symbol=" << symbol << " trades=" << tmp_s.trades
+		      << " volume=" << tmp_s.volume << " min=" << tmp_s.min_price
+		      << " max=" << tmp_s.max_price << " buy=" << tmp_s.buy_count
+		      << " sell=" << tmp_s.sell_count << '\n';
 		tmp_s.reset();
 	}
-	out.flush();
+	m_out.flush();
 	return true;
 }
 
-bool Aggregator::flushIf(std::ofstream& out) noexcept {
-	const auto now = std::chrono::steady_clock::now();
-	const std::unique_lock<std::mutex> lock(m_mutex);
-	if (now < m_next_flush) {
-		spdlog::debug("Flush not needed yet.");
-		return true;
-	}
-	m_next_flush = now + m_flush_period;
-
-	const auto wall_clock = std::chrono::system_clock::now();
-	return writeSnapshotSync(out, wall_clock);
+std::thread Aggregator::startFlushWorker() noexcept {
+	return std::thread(&Aggregator::flushWorker, this);
 }
 
-bool Aggregator::forceFlush(std::ofstream& out) noexcept {
-	const std::lock_guard<std::mutex> lock(m_mutex);
-	return writeSnapshotSync(out, std::chrono::system_clock::now());
+void Aggregator::flushWorker() noexcept {
+	while (!m_canceler.isCanceled()) {
+		auto now = std::chrono::steady_clock::now();
+		const std::unique_lock<std::mutex> lock(m_mutex);
+		if (now > m_next_flush) {
+			if (!writeSnapshotSync()) {
+				spdlog::error("Failed to write snapshot");
+			} else {
+				spdlog::info("Snapshot flushed successfully");
+			}
+		} else {
+			std::this_thread::yield();
+			const auto dur =
+			    std::chrono::duration_cast<std::chrono::milliseconds>(
+			        m_next_flush - now);
+			std::this_thread::sleep_for(dur);
+		}
+		m_next_flush = now + m_flush_period;
+	}
 }
 
 } // namespace DataCollector

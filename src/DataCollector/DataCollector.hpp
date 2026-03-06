@@ -47,7 +47,7 @@ private:
 	                          const std::string& target) noexcept;
 	void receiveAndStore(
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
-	void aggregateData(std::ofstream& out, Aggregator& aggregator) noexcept;
+	void aggregateData(Aggregator& aggregator) noexcept;
 	void clearQueue() noexcept;
 };
 

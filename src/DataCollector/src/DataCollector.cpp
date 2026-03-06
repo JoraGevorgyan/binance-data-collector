@@ -35,7 +35,7 @@ std::string makeStreamPath(const std::vector<std::string>& streams) noexcept {
 }
 
 std::size_t validateWorkersNum(std::size_t num) noexcept {
-	constexpr int busy_workers = 2;
+	constexpr int busy_workers = 3; // main, flush worker, client session
 	if (num <= busy_workers) {
 		spdlog::warn("Max threads num {} is too low.");
 		return 1;
@@ -53,27 +53,25 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 	spdlog::info("Trying to create a session");
 	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
 
-	DataCollector::Aggregator aggregator(m_config.getStatsFlushPeriod());
-	std::ofstream outfile(m_config.getStatsOutputPath(), std::ios::app);
+	DataCollector::Aggregator aggregator(m_config.getStatsFlushPeriod(),
+	                                     m_config.getStatsOutputPath(),
+	                                     m_canceler);
 
+	auto flush_worker_thread = aggregator.startFlushWorker();
 	const auto workers_num = validateWorkersNum(m_config.getMaxThreadsNum());
 	std::vector<std::thread> aggregator_threads;
 	aggregator_threads.reserve(workers_num);
 	for (std::size_t i = 0; i < workers_num; ++i) {
-		aggregator_threads.emplace_back([&aggregator, &outfile, this]() {
-			aggregateData(outfile, aggregator);
-		});
+		aggregator_threads.emplace_back(
+		    [&aggregator, this]() { aggregateData(aggregator); });
 	}
 
 	client_session_thread.join();
 	for (auto& aggregator_thread : aggregator_threads) {
 		aggregator_thread.join();
 	}
+	flush_worker_thread.join();
 
-	if (!aggregator.forceFlush(outfile)) {
-		spdlog::warn("force flush failed.");
-		return false;
-	}
 	spdlog::info("Shutdown complete");
 	return true;
 }
@@ -179,8 +177,7 @@ void WebSocketClient::receiveAndStore(
 	}
 }
 
-void WebSocketClient::aggregateData(std::ofstream& out,
-                                    Aggregator& aggregator) noexcept {
+void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 	while (!m_canceler.isCanceled()) {
 		const std::string* cur_message_ptr = nullptr;
 		if (!m_blk_queue_str_items.pop(cur_message_ptr) ||
@@ -193,11 +190,7 @@ void WebSocketClient::aggregateData(std::ofstream& out,
 		    Aggregator::parseTradeEvent(*cur_message_ptr);
 		if (trade_event_opt.has_value()) {
 			aggregator.update(trade_event_opt.value());
-			if (!aggregator.flushIf(out)) {
-				spdlog::error("Failed to flush aggregator data");
-			} else {
-				spdlog::debug("Message processed successfully");
-			}
+			spdlog::debug("updated stats");
 		} else {
 			spdlog::warn("Failed to parse message: {}", *cur_message_ptr);
 		}

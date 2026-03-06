@@ -5,6 +5,9 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
+#include <unordered_map>
+#include "../common/Canceler.hpp"
 
 namespace DataCollector {
 
@@ -35,24 +38,27 @@ struct TradeEvent {
 
 class Aggregator {
 public:
-	explicit Aggregator(std::chrono::seconds flush_period);
+	explicit Aggregator(std::chrono::seconds flush_period,
+	                    std::string output_dir,
+	                    Canceler::Canceler& canceler);
 
 	[[nodiscard]] static std::optional<TradeEvent> parseTradeEvent(
 	    const std::string& message) noexcept;
+	[[nodiscard]] std::thread startFlushWorker() noexcept;
 	void update(const TradeEvent& event_msg) noexcept;
-	[[nodiscard]] bool flushIf(std::ofstream& out) noexcept;
-	[[nodiscard]] bool forceFlush(std::ofstream& out) noexcept;
 
 private:
-	std::mutex m_mutex;
-	std::map<std::string, TradeStatistics> m_statistics;
 	const std::chrono::seconds m_flush_period;
+	const std::string m_flush_out_dir;
+	Canceler::Canceler& m_canceler;
 	std::chrono::steady_clock::time_point m_next_flush;
+	std::ofstream m_out;
+	std::unordered_map<std::string, TradeStatistics> m_statistics;
+	std::mutex m_mutex;
 
 private:
-	bool writeSnapshotSync(
-	    std::ofstream& out,
-	    std::chrono::system_clock::time_point wall_clock) noexcept;
+	bool writeSnapshotSync() noexcept;
+	void flushWorker() noexcept;
 };
 
 } // namespace DataCollector
