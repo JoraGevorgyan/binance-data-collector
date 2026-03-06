@@ -138,6 +138,7 @@ bool Config::updateConfig() noexcept {
 		m_check_period = std::chrono::seconds(10);
 
 		m_max_retries_num = 100;
+		m_reconnection_delay = std::chrono::minutes(20 * 60);
 		m_stats_flush_period = std::chrono::seconds(40);
 		m_stats_output_path = g_def_stats_out_path_c;
 		m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;

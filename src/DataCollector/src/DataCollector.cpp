@@ -130,7 +130,15 @@ bool WebSocketClient::runClient() noexcept {
 
 bool WebSocketClient::receiveAndStore(
     websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream) {
+	const auto reconnection_delay = m_config.getReconnectionDelay();
+	const auto timer = std::chrono::steady_clock::now();
 	while (!m_canceler.isCanceled()) {
+		if (std::chrono::steady_clock::now() - timer >= reconnection_delay) {
+			spdlog::warn("Reconnection delay of {} minutes exceeded.",
+			             reconnection_delay.count());
+			spdlog::warn("Stopping session to reconnect...");
+			return true;
+		}
 		beast::flat_buffer buffer;
 		beast::error_code ec;
 		ws_stream.read(buffer, ec);

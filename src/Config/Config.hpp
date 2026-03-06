@@ -28,6 +28,7 @@ public:
 	std::chrono::seconds getConnectPeriod() const noexcept;
 	std::chrono::seconds getCheckPeriod() const noexcept;
 	std::size_t getMaxRetriesNum() const noexcept;
+	std::chrono::minutes getReconnectionDelay() const noexcept;
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
 	std::string getStatsOutputPath() const noexcept;
 	std::size_t getMaxThreadsNum() const noexcept;
@@ -44,6 +45,7 @@ private:
 	std::chrono::seconds m_connect_period;
 	std::chrono::seconds m_check_period;
 	std::size_t m_max_retries_num;
+	std::chrono::minutes m_reconnection_delay;
 	std::chrono::seconds m_stats_flush_period;
 	std::string m_stats_output_path;
 	std::size_t m_max_threads_num;
