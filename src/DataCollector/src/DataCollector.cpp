@@ -166,9 +166,16 @@ bool WebSocketClient::receiveAndStore(
 			return false;
 		}
 		const auto message = beast::buffers_to_string(buffer.data());
-		buffer.consume(buffer.size());
-		if (!m_blk_queue_str_items.bounded_push(
-		        std::string_view(message.data(), message.size()))) {
+		const std::string* msg_ptr = new (std::nothrow) std::string(message);
+		if (msg_ptr == nullptr) {
+			spdlog::error("Failed to allocate memory for message copy");
+			std::this_thread::yield();
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			continue;
+		}
+		spdlog::debug("Received message: {}", message);
+		if (!m_blk_queue_str_items.bounded_push(msg_ptr)) {
+			delete msg_ptr;
 			spdlog::warn("Failed to push message to queue");
 			std::this_thread::yield();
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -180,21 +187,34 @@ bool WebSocketClient::receiveAndStore(
 void WebSocketClient::aggregateData(std::ofstream& out,
                                     Aggregator& aggregator) noexcept {
 	while (!m_canceler.isCanceled()) {
-		std::string cur_message;
-		if (!m_blk_queue_str_items.pop(cur_message)) {
+		const std::string* cur_message_ptr = nullptr;
+		if (!m_blk_queue_str_items.pop(cur_message_ptr) ||
+		    cur_message_ptr == nullptr) {
 			spdlog::debug("No message to process, sleeping...");
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
-		const auto trade_event_opt = Aggregator::parseTradeEvent(cur_message);
+		const auto trade_event_opt =
+		    Aggregator::parseTradeEvent(*cur_message_ptr);
 		if (trade_event_opt.has_value()) {
 			aggregator.update(trade_event_opt.value());
+			if (!aggregator.flushIf(out)) {
+				spdlog::error("Failed to flush aggregator data");
+			} else {
+				spdlog::debug("Message processed successfully");
+			}
 		} else {
-			spdlog::warn("Failed to parse message: {}", cur_message);
+			spdlog::warn("Failed to parse message: {}", *cur_message_ptr);
 		}
-		if (!aggregator.flushIf(out)) {
-			spdlog::error("Failed to flush aggregator data");
-		}
+		delete cur_message_ptr;
+	}
+}
+
+void WebSocketClient::clearQueue() noexcept {
+	const std::string* cur_message_ptr = nullptr;
+	while (m_blk_queue_str_items.pop(cur_message_ptr)) {
+		delete cur_message_ptr;
+		cur_message_ptr = nullptr;
 	}
 }
 

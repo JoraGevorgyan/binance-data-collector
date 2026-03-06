@@ -15,6 +15,8 @@
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/lockfree/queue.hpp>
 
+#include <string>
+
 namespace DataCollector {
 
 namespace beast = boost::beast;
@@ -27,20 +29,22 @@ public:
 	                         Canceler::Canceler& canceler);
 	WebSocketClient(const WebSocketClient&) = delete;
 	WebSocketClient& operator=(const WebSocketClient&) = delete;
-	~WebSocketClient() = default;
+	~WebSocketClient() { clearQueue(); }
 
 	bool runWebSocketSession() noexcept;
 
 private:
 	const Config::Config& m_config;
 	Canceler::Canceler& m_canceler;
-	boost::lockfree::queue<std::string_view> m_blk_queue_str_items{1024};
+	boost::lockfree::queue<const std::string*, boost::lockfree::capacity<1024>>
+	    m_blk_queue_str_items;
 
 private:
 	void runClientSession() noexcept;
 	bool receiveAndStore(
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
 	void aggregateData(std::ofstream& out, Aggregator& aggregator) noexcept;
+	void clearQueue() noexcept;
 };
 
 } // namespace DataCollector

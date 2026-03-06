@@ -31,6 +31,8 @@ Aggregator::Aggregator(std::chrono::seconds flush_period)
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {
 	{
+		spdlog::debug("Parsing message: {}", message);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
 		TradeEvent result;
 		nlohmann::json js_obj = nlohmann::json::parse(message, nullptr, false);
 		if (js_obj.is_discarded()) {
