@@ -29,6 +29,31 @@ constexpr auto port = "port";
 
 } // namespace Key
 
+spdlog::level::level_enum getLogLvlFromStr(const std::string& level) noexcept {
+	if (boost::iequals(level, "trace")) {
+		return spdlog::level::trace;
+	}
+	if (boost::iequals(level, "debug")) {
+		return spdlog::level::debug;
+	}
+	if (boost::iequals(level, "info")) {
+		return spdlog::level::info;
+	}
+	if (boost::iequals(level, "warn")) {
+		return spdlog::level::warn;
+	}
+	if (boost::iequals(level, "error")) {
+		return spdlog::level::err;
+	}
+	if (boost::iequals(level, "critical")) {
+		return spdlog::level::critical;
+	}
+	if (boost::iequals(level, "off")) {
+		return spdlog::level::off;
+	}
+	return spdlog::level::info;
+}
+
 std::string getConfigPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::config].as<std::string>();
 }
@@ -87,7 +112,6 @@ std::unique_ptr<Config>& Config::getInstance() {
 nlohmann::json Config::getJsonValues() const noexcept {
 	using json = nlohmann::json;
 	json res{};
-	// todo
 	res[Key::log_path] = m_log_path;
 	return res;
 }
@@ -95,27 +119,7 @@ nlohmann::json Config::getJsonValues() const noexcept {
 spdlog::level::level_enum Config::getLogLevel() const noexcept {
 	if (m_po_var_map.count(Key::log_level) > 0) { // CLI overrides config file
 		const auto level = m_po_var_map[Key::log_level].as<std::string>();
-		if (boost::iequals(level, "trace")) {
-			return spdlog::level::trace;
-		}
-		if (boost::iequals(level, "debug")) {
-			return spdlog::level::debug;
-		}
-		if (boost::iequals(level, "info")) {
-			return spdlog::level::info;
-		}
-		if (boost::iequals(level, "warn")) {
-			return spdlog::level::warn;
-		}
-		if (boost::iequals(level, "error")) {
-			return spdlog::level::err;
-		}
-		if (boost::iequals(level, "critical")) {
-			return spdlog::level::critical;
-		}
-		if (boost::iequals(level, "off")) {
-			return spdlog::level::off;
-		}
+		return getLogLvlFromStr(level);
 	}
 	return m_log_level.value_or(spdlog::level::info);
 }
@@ -180,24 +184,24 @@ bool Config::initLogger() const noexcept {
 }
 
 void Config::setDefaultValues() noexcept {
-	m_connect_period = std::chrono::seconds(60);
-	m_check_period = std::chrono::seconds(10);
-	m_max_retries_num = 10;
-	m_reconnection_delay = std::chrono::minutes(20 * 60);
-	m_stats_flush_period = std::chrono::seconds(40);
-	m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
-	m_streams_list = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
-	m_host_name = "stream.binance.com";
-	m_port = "9443";
-	if (!m_stats_output_path.has_value()) {
-		m_stats_output_path = "statistics.log";
-	}
 	if (!m_log_path.has_value()) {
 		m_log_path = "current.log";
 	}
 	if (!m_log_level.has_value()) {
 		m_log_level = spdlog::level::info;
 	}
+	if (!m_stats_output_path.has_value()) {
+		m_stats_output_path = "statistics.log";
+	}
+	m_connect_period = std::chrono::seconds(60);
+	m_check_period = std::chrono::seconds(10);
+	m_max_retries_num = 10;
+	m_stats_flush_period = std::chrono::seconds(40);
+	m_reconnection_delay = std::chrono::minutes(20 * 60);
+	m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
+	m_streams_list = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
+	m_host_name = "stream.binance.com";
+	m_port = "9443";
 }
 
 void Config::initValuesFromConfIfValid(
@@ -212,6 +216,15 @@ void Config::initValuesFromConfIfValid(
 		}
 		json config = json::parse(in_stream, nullptr, false /*nothrow*/,
 		                          true /*ignore comments*/);
+
+		if (config.contains(Key::log_level)) {
+			m_log_level =
+			    getLogLvlFromStr(config[Key::log_level].get<std::string>());
+		}
+		if (config.contains(Key::stats_path)) {
+			m_stats_output_path =
+			    config[Key::stats_path].get<std::string>();
+		}
 		if (config.contains(Key::connect_period_seconds)) {
 			const auto tmp = std::chrono::seconds(
 			    config[Key::connect_period_seconds].get<unsigned>());
@@ -236,6 +249,13 @@ void Config::initValuesFromConfIfValid(
 			}
 		}
 
+		if (config.contains(Key::stats_flush_period_seconds)) {
+			const auto tmp = std::chrono::seconds(
+			    config[Key::stats_flush_period_seconds].get<unsigned>());
+			if (tmp.count() > 0 && tmp.count() < m_connect_period.count()) {
+				m_stats_flush_period = tmp;
+			}
+		}
 		if (config.contains(Key::reconnection_delay_minutes)) {
 			const auto tmp = std::chrono::minutes(
 			    config[Key::reconnection_delay_minutes].get<unsigned>());
@@ -244,13 +264,6 @@ void Config::initValuesFromConfIfValid(
 			}
 		}
 
-		if (config.contains(Key::stats_flush_period_seconds)) {
-			const auto tmp = std::chrono::seconds(
-			    config[Key::stats_flush_period_seconds].get<unsigned>());
-			if (tmp.count() > 0 && tmp.count() < m_connect_period.count()) {
-				m_stats_flush_period = tmp;
-			}
-		}
 		if (config.contains(Key::max_threads_num)) {
 			m_max_threads_num = config[Key::max_threads_num].get<unsigned>();
 		}
@@ -282,8 +295,8 @@ void Config::dumpValidConfValues(
 
 void Config::updateConfig() noexcept {
 	auto config_path = getConfigPath(m_po_var_map);
-	initValuesFromCli(); // will not be changed if set
-	setDefaultValues();  // will be overridden by config values exist any
+	initValuesFromCli();   // will not be changed if set
+	setDefaultValues();    // will be overridden by config values exist any
 	std::error_code err_c; // need this way to have no throw
 	if (!std::filesystem::exists(config_path, err_c)) {
 		dumpValidConfValues(config_path);
