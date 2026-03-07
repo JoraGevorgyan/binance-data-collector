@@ -54,6 +54,27 @@ spdlog::level::level_enum getLogLvlFromStr(const std::string& level) noexcept {
 	return spdlog::level::info;
 }
 
+std::string logLvlToString(spdlog::level::level_enum level) noexcept {
+	switch (level) {
+		case spdlog::level::trace:
+			return "trace";
+		case spdlog::level::debug:
+			return "debug";
+		case spdlog::level::info:
+			return "info";
+		case spdlog::level::warn:
+			return "warn";
+		case spdlog::level::err:
+			return "error";
+		case spdlog::level::critical:
+			return "critical";
+		case spdlog::level::off:
+			return "off";
+		default:
+			return "info";
+	}
+}
+
 std::string getConfigPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::config].as<std::string>();
 }
@@ -112,7 +133,19 @@ std::unique_ptr<Config>& Config::getInstance() {
 nlohmann::json Config::getJsonValues() const noexcept {
 	using json = nlohmann::json;
 	json res{};
-	res[Key::log_path] = m_log_path;
+
+	res[Key::log_level] = logLvlToString(m_log_level.value());
+	res[Key::stats_path] = m_stats_output_path.value();
+	res[Key::connect_period_seconds] = m_connect_period.count();
+	res[Key::check_period_seconds] = m_check_period.count();
+	res[Key::max_retries_num] = m_max_retries_num;
+	res[Key::stats_flush_period_seconds] = m_stats_flush_period.count();
+	res[Key::reconnection_delay_minutes] = m_reconnection_delay.count();
+	res[Key::max_threads_num] = m_max_threads_num;
+	res[Key::streams] = m_streams_list;
+	res[Key::host] = m_host_name;
+	res[Key::port] = m_port;
+
 	return res;
 }
 
@@ -222,8 +255,7 @@ void Config::initValuesFromConfIfValid(
 			    getLogLvlFromStr(config[Key::log_level].get<std::string>());
 		}
 		if (config.contains(Key::stats_path)) {
-			m_stats_output_path =
-			    config[Key::stats_path].get<std::string>();
+			m_stats_output_path = config[Key::stats_path].get<std::string>();
 		}
 		if (config.contains(Key::connect_period_seconds)) {
 			const auto tmp = std::chrono::seconds(
