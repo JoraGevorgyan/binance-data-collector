@@ -8,11 +8,21 @@ cmake --preset PRESET_NAME -B BUILD_DIR -S .
 cmake --build BUILD_DIR
 ```
 
+### to code style(if set in preset)
+```bash
+cmake --build BUILD_DIR --target format_apply
+```
+
+### to run tests(if set in preset)
+```bash
+cd BUILD_DIR && ctest
+```
+
 ## Install as systemd service
 this would be done by package creation and installation in future
 
 ```bash
-sudo cmake --install BUILD_DIR
+sudo cmake --build BUILD_DIR --target install
 sudo systemctl daemon-reload
 sudo systemctl enable --now binance-data-collector-service
 ```
