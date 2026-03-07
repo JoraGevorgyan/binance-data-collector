@@ -1,12 +1,12 @@
 #include <boost/test/unit_test.hpp>
 #include "DataCollector/Aggregator.hpp"
 
+#include <unistd.h>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <thread>
-#include <unistd.h>
 
 BOOST_AUTO_TEST_CASE(aggregator_parse_trade_event_success) {
 	const std::string msg =
@@ -34,16 +34,15 @@ BOOST_AUTO_TEST_CASE(aggregator_parse_trade_event_rejects_invalid_messages) {
 
 BOOST_AUTO_TEST_CASE(aggregator_flush_worker_writes_snapshot) {
 	Canceler::Canceler canceler;
-	const auto tmp_path = std::filesystem::temp_directory_path() /
-	                      ("aggregator_ut_" + std::to_string(getpid()) +
-	                       "_" +
-	                       std::to_string(std::chrono::steady_clock::now()
-	                                          .time_since_epoch()
-	                                          .count()) +
-	                       ".log");
+	const auto tmp_path =
+	    std::filesystem::temp_directory_path() /
+	    ("aggregator_ut_" + std::to_string(getpid()) + "_" +
+	     std::to_string(
+	         std::chrono::steady_clock::now().time_since_epoch().count()) +
+	     ".log");
 
-	DataCollector::Aggregator aggregator(
-	    std::chrono::seconds(1), tmp_path.string(), canceler);
+	DataCollector::Aggregator aggregator(std::chrono::seconds(1),
+	                                     tmp_path.string(), canceler);
 
 	DataCollector::TradeEvent first_event;
 	first_event.symbol = "BTCUSDT";
