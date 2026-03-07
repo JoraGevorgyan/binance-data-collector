@@ -1,0 +1,16 @@
+# not used yet, but config.cpp will parse this in future
+
+log_level: info
+connect_period_seconds: 60
+check_period_seconds: 10
+max_retries_num: 10
+reconnection_delay_minutes: 1200
+stats_flush_period_seconds: 40
+stats_output_path: /var/log/binance-data-collector/statistics.log
+max_threads_num: 4
+streams_list:
+  - btcusdt@trade
+  - ethusdt@trade
+  - bnbusdt@trade
+host_name: stream.binance.com
+port: "9443"
