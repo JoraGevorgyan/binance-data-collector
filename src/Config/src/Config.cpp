@@ -21,7 +21,7 @@ constexpr auto g_service_name_c = "binance-data-collector-service";
 constexpr auto g_service_display_name_c = "Binance Data Collector Service";
 // TODO: add working dir in future and save all files there
 constexpr auto g_def_stats_out_path_c =
-    "/home/zhora/stats/binance-data-collector/statistics.log";
+    "/var/log/binance-data-collector/statistics.log";
 
 std::string getLogPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::log_path].as<std::string>();

@@ -138,8 +138,13 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 		spdlog::info("Connected to {}{}", host, target);
 
 		receiveAndStore(ws_stream);
+		spdlog::info("Closing WebSocket connection to {}{}", host, target);
 		beast::error_code ec_close;
 		ws_stream.close(websocket::close_code::normal, ec_close);
+		if (ec_close) {
+			spdlog::error("Error closing WebSocket connection: {}",
+			              ec_close.message());
+		}
 	} catch (const std::exception& ex) {
 		spdlog::error("Connection loop exception: {}", ex.what());
 	}
