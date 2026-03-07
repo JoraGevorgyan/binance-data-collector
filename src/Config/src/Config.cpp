@@ -188,6 +188,10 @@ bool Config::init(int argc, char* argv[]) noexcept {
 }
 
 bool Config::initLogger() const noexcept {
+	if (m_logger != nullptr) {
+		m_logger->set_level(m_log_level.value());
+		return true;
+	}
 	try {
 		std::shared_ptr<spdlog::sinks::sink> sink = nullptr;
 		auto log_level = getLogLevel();
@@ -336,6 +340,9 @@ void Config::updateConfig() noexcept {
 	}
 	initValuesFromConfIfValid(config_path);
 	dumpValidConfValues(config_path);
+	if (m_logger != nullptr) {
+		m_logger->set_level(m_log_level.value());
+	}
 }
 
 bool Config::isHelp() const noexcept {

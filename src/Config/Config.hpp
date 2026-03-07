@@ -9,7 +9,7 @@ namespace Config {
 
 namespace po = boost::program_options;
 
-class Config {
+class Config final {
 public:
 	Config(const Config&) = delete;
 	Config& operator=(const Config&) = delete;
@@ -41,6 +41,7 @@ private:
 	static std::unique_ptr<Config> m_instance;
 	po::variables_map m_po_var_map;
 	po::options_description m_po_desc{"Allowed options"};
+	std::shared_ptr<spdlog::logger> m_logger;
 
 	std::optional<spdlog::level::level_enum> m_log_level;
 	std::optional<std::string> m_log_path;
@@ -63,7 +64,6 @@ private:
 	void setDefaultValues() noexcept;
 	nlohmann::json getJsonValues() const noexcept;
 
-private:
 	Config() = default;
 };
 
