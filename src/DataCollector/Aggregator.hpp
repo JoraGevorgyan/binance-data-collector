@@ -39,7 +39,7 @@ struct TradeEvent {
 class Aggregator {
 public:
 	explicit Aggregator(std::chrono::seconds flush_period,
-	                    std::string output_dir,
+	                    std::string output_path,
 	                    Canceler::Canceler& canceler);
 
 	[[nodiscard]] static std::optional<TradeEvent> parseTradeEvent(
@@ -49,12 +49,11 @@ public:
 
 private:
 	const std::chrono::seconds m_flush_period;
-	const std::string m_flush_out_dir;
+	const std::string m_flush_out_path;
 	Canceler::Canceler& m_canceler;
 	std::ofstream m_out;
 	std::unordered_map<std::string, TradeStatistics> m_statistics;
 	std::mutex m_mutex;
-	static std::size_t m_next_stats_file;
 
 private:
 	bool writeSnapshotSync() noexcept;

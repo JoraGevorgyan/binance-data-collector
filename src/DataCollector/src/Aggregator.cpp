@@ -24,29 +24,29 @@ std::string formatTimestamp(
 }
 
 std::optional<std::filesystem::path> getValidFullPath(
-    const std::string& dir,
-    const std::string& f_name) noexcept {
+    const std::string& path) noexcept {
 	namespace fs = std::filesystem;
 	std::error_code err_c;
-	const fs::path base_path(dir);
+	const fs::path full_path(path);
+	const fs::path dir_path = full_path.parent_path();
 
-	if (!fs::exists(base_path, err_c)) {
-		if (!fs::create_directories(base_path, err_c) && err_c) {
+	if (!dir_path.empty() && !fs::exists(dir_path, err_c)) {
+		if (!fs::create_directories(dir_path, err_c) && err_c) {
 			spdlog::error("Failed to create directory {}: {}",
-			              base_path.string(), err_c.message());
+			              dir_path.string(), err_c.message());
 			return std::nullopt;
 		}
 	}
-	return base_path / f_name;
+	return full_path;
 }
 
 } // namespace
 
 Aggregator::Aggregator(std::chrono::seconds flush_period,
-                       std::string output_dir,
+                       std::string output_path,
                        Canceler::Canceler& canceler)
     : m_flush_period(flush_period),
-      m_flush_out_dir(std::move(output_dir)),
+      m_flush_out_path(std::move(output_path)),
       m_canceler(canceler) {}
 
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
@@ -101,21 +101,12 @@ void Aggregator::update(const TradeEvent& event_msg) noexcept {
 	}
 }
 
-std::size_t Aggregator::m_next_stats_file = 1;
-
 bool Aggregator::isStreamAvailable() noexcept {
 	if (m_out.is_open()) {
 		return true;
 	}
-	// TODO: check currenttly open file size, and if needed create a new one
-	const auto n_name = std::to_string(m_next_stats_file) + "_statistics.log";
-	++m_next_stats_file;
-	if (m_next_stats_file >= 1000) { // configure
-		spdlog::critical("Too many stats files, cannot create new one");
-		return false;
-	}
-	const auto full_path = getValidFullPath(m_flush_out_dir, n_name);
-	m_out.open(full_path.value_or(n_name), std::ios::out | std::ios::app);
+	const auto full_path = getValidFullPath(m_flush_out_path);
+	m_out.open(full_path.value_or("statistics.log"), std::ios::app);
 	return m_out.is_open();
 }
 
