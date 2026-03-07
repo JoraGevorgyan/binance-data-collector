@@ -4,6 +4,13 @@ set(NAME DataCollector)
 
 add_library(${NAME} ${SOURCES} ${HEADERS})
 
+target_include_directories(
+	${NAME}
+	PRIVATE
+	"${CMAKE_SOURCE_DIR}/thirdparty/nlohmann"
+)
+
+
 target_link_libraries(
 	${NAME}
 	PRIVATE
@@ -12,7 +19,6 @@ target_link_libraries(
 		Boost::system
 		OpenSSL::SSL
 		OpenSSL::Crypto
-		nlohmann_json::nlohmann_json
 		${LOGGER_NAME}
 )
 

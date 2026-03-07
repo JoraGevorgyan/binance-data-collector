@@ -71,7 +71,6 @@ if (RUN_TESTS)
 			${CMAKE_CURRENT_LIST_DIR}/../DataCollector/src/Aggregator.cpp
 			${CMAKE_CURRENT_LIST_DIR}/../common/src/Canceler.cpp
 		LIBRARIES
-			nlohmann_json::nlohmann_json
 			${LOGGER_NAME}
 	)
 
@@ -102,7 +101,6 @@ if (RUN_TESTS)
 			Boost::system
 			OpenSSL::SSL
 			OpenSSL::Crypto
-			nlohmann_json::nlohmann_json
 			${LOGGER_NAME}
 	)
 endif()

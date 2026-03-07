@@ -7,7 +7,7 @@
 #include <sstream>
 #include <thread>
 #include <vector>
-#include "nlohmann/json.hpp"
+#include "json.hpp"
 #include "spdlog/spdlog.h"
 
 namespace DataCollector {
