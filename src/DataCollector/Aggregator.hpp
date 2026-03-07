@@ -41,6 +41,11 @@ public:
 	explicit Aggregator(std::chrono::seconds flush_period,
 	                    std::string output_path,
 	                    Canceler::Canceler& canceler);
+	~Aggregator() {
+		if (m_out.is_open()) {
+			m_out.close();
+		}
+	}
 
 	[[nodiscard]] static std::optional<TradeEvent> parseTradeEvent(
 	    const std::string& message) noexcept;
