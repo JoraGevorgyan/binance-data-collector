@@ -1,3 +1,5 @@
+# not ready yet, need to add coverage target and report generation
+
 option(RUN_CODE_COVERAGE "Enable code coverage reporting" OFF)
 
 if (RUN_CODE_COVERAGE)
@@ -31,7 +33,7 @@ if (RUN_CODE_COVERAGE)
                 )
             endfunction()
         else()
-            message(ERROR "grcov not found. run 'cargo install grcov' to install")
+            message(ERROR "grcov not found.")
         endif()
     else()
         message(WARNING "Code coverage is only supported with Clang. Current compiler: ${CMAKE_CXX_COMPILER_ID}")
