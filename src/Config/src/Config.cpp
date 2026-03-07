@@ -21,7 +21,7 @@ constexpr auto g_service_name_c = "binance-data-collector-service";
 constexpr auto g_service_display_name_c = "Binance Data Collector Service";
 // TODO: add working dir in future and save all files there
 constexpr auto g_def_stats_out_path_c =
-    "/var/log/binance-data-collector/statistics.log";
+    "/home/zhora/stats/binance-data-collector/statistics.log";
 
 std::string getLogPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::log_path].as<std::string>();
@@ -99,22 +99,22 @@ bool Config::init(int argc, char* argv[]) noexcept {
 }
 
 bool Config::initLogger() const noexcept {
-	try { // need to refactor
+	try {
+		std::shared_ptr<spdlog::sinks::sink> sink = nullptr;
 		auto log_level = getLogLevel();
 		if (isDebugMode()) {
 			log_level = spdlog::level::debug;
-			spdlog::set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
-			spdlog::set_level(log_level);
-			return true;
+			sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
+		} else {
+			sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
+			    getLogPath(m_po_var_map), true);
 		}
 
-		auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-		    getLogPath(m_po_var_map), true);
-		auto logger = std::make_shared<spdlog::logger>(
-		    "binance-data-collector", spdlog::sinks_init_list{file_sink});
+		auto logger =
+		    std::make_shared<spdlog::logger>("binance-data-collector", sink);
 		logger->set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
 		logger->set_level(log_level);
-		logger->flush_on(spdlog::level::err);
+		logger->flush_on(log_level);
 		spdlog::register_logger(logger);
 		spdlog::set_default_logger(logger);
 	} catch (const spdlog::spdlog_ex& err) {
