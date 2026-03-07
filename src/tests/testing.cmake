@@ -62,4 +62,47 @@ if (RUN_TESTS)
 			Boost::program_options
 			${LOGGER_NAME}
 	)
+
+	add_boost_unit_test(
+		ut_data_collector_aggregator
+		DataCollectorAggregatorTests
+		SOURCES
+			${UNIT_TESTS_DIR}/test_data_collector_aggregator.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../DataCollector/src/Aggregator.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../common/src/Canceler.cpp
+		LIBRARIES
+			nlohmann_json::nlohmann_json
+			${LOGGER_NAME}
+	)
+
+	add_boost_unit_test(
+		ut_service
+		ServiceTests
+		SOURCES
+			${UNIT_TESTS_DIR}/test_service.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../Service/src/Service.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../Service/src/ServiceBase.cpp
+		LIBRARIES
+			${LOGGER_NAME}
+	)
+
+	add_boost_unit_test(
+		ut_service_data_collector
+		ServiceDataCollectorTests
+		SOURCES
+			${UNIT_TESTS_DIR}/test_service_data_collector.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../Service/src/ServiceDataCollector.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../Service/src/ServiceBase.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../DataCollector/src/DataCollector.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../DataCollector/src/Aggregator.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../Config/src/Config.cpp
+			${CMAKE_CURRENT_LIST_DIR}/../common/src/Canceler.cpp
+		LIBRARIES
+			Boost::program_options
+			Boost::system
+			OpenSSL::SSL
+			OpenSSL::Crypto
+			nlohmann_json::nlohmann_json
+			${LOGGER_NAME}
+	)
 endif()
