@@ -212,9 +212,7 @@ void WebSocketClient::clearQueue() noexcept {
 	spdlog::debug("Clearing message queue");
 	const std::string* cur_message_ptr = nullptr;
 	while (m_blk_queue_str_items.pop(cur_message_ptr)) {
-		if (cur_message_ptr != nullptr) {
-			delete cur_message_ptr;
-		}
+		delete cur_message_ptr;
 		cur_message_ptr = nullptr;
 	}
 }
