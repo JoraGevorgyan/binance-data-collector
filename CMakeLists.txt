@@ -7,6 +7,9 @@ enable_testing()
 include(src/build-options.cmake)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/code_coverage.cmake
+)
 
 add_subdirectory(thirdparty EXCLUDE_FROM_ALL)
 add_subdirectory(src)
