@@ -111,25 +111,29 @@ bool Aggregator::isStreamAvailable() noexcept {
 }
 
 bool Aggregator::writeSnapshotSync() noexcept {
-	const std::unique_lock<std::mutex> lock(m_mutex);
 	if (!isStreamAvailable()) {
 		spdlog::critical("cannot dump statistics to a file");
 		return false;
 	}
+	std::unordered_map<std::string, TradeStatistics> cur_stats;
+	{
+		const std::lock_guard<std::mutex> lock(m_mutex);
+		cur_stats = m_statistics;
+		for (auto& entry : m_statistics) {
+			entry.second.reset();
+		}
+	}
+
 	const auto timestamp = formatTimestamp(std::chrono::system_clock::now());
 	m_out << "timestamp=" << timestamp << '\n';
 
-	for (auto& entry : m_statistics) {
+	for (const auto& entry : cur_stats) {
 		const std::string& symbol = entry.first;
-		TradeStatistics& tmp_s = entry.second;
-		if (tmp_s.trades == 0) {
-			continue;
-		}
+		const TradeStatistics& tmp_s = entry.second;
 		m_out << "symbol=" << symbol << " trades=" << tmp_s.trades
 		      << " volume=" << tmp_s.volume << " min=" << tmp_s.min_price
 		      << " max=" << tmp_s.max_price << " buy=" << tmp_s.buy_count
 		      << " sell=" << tmp_s.sell_count << '\n';
-		tmp_s.reset();
 	}
 	m_out.flush();
 	return true;
@@ -142,7 +146,7 @@ std::thread Aggregator::startFlushWorker() noexcept {
 void Aggregator::flushWorker() noexcept {
 	auto next_flush = std::chrono::steady_clock::now();
 	while (!m_canceler.isCanceled()) {
-		spdlog::info("flush worker thread in progress");
+		spdlog::debug("flush worker thread in progress");
 		next_flush += m_flush_period;
 		std::this_thread::sleep_until(next_flush);
 		if (m_canceler.isCanceled()) {
