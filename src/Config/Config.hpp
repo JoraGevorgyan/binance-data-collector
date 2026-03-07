@@ -2,6 +2,7 @@
 #include <boost/program_options.hpp>
 #include <memory>
 #include <string_view>
+#include "json.hpp"
 #include "spdlog/spdlog.h"
 
 namespace Config {
@@ -42,12 +43,13 @@ private:
 	po::options_description m_po_desc{"Allowed options"};
 
 	std::optional<spdlog::level::level_enum> m_log_level;
+	std::optional<std::string> m_log_path;
+	std::optional<std::string> m_stats_output_path;
 	std::chrono::seconds m_connect_period;
 	std::chrono::seconds m_check_period;
 	std::size_t m_max_retries_num;
 	std::chrono::minutes m_reconnection_delay;
 	std::chrono::seconds m_stats_flush_period;
-	std::string m_stats_output_path;
 	std::size_t m_max_threads_num;
 	std::vector<std::string> m_streams_list;
 	std::string m_host_name;
@@ -55,6 +57,11 @@ private:
 
 private:
 	spdlog::level::level_enum getLogLevel() const noexcept;
+	void initValuesFromCli() noexcept;
+	void initValuesFromConfOrDefs(const std::string& config_path) noexcept;
+	void dumpValidConfValues(const std::string& config_path) const noexcept;
+	void setDefaultValues() noexcept;
+	nlohmann::json getJsonValues() const noexcept;
 
 private:
 	Config() = default;
