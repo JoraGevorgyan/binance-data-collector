@@ -28,7 +28,6 @@ constexpr auto host = "host";
 constexpr auto port = "port";
 
 } // namespace Key
-;
 
 std::string getConfigPath(const po::variables_map& var_map) noexcept {
 	return var_map[Key::config].as<std::string>();
@@ -52,13 +51,13 @@ bool writeJsonToFile(const nlohmann::json& obj,
 	}
 }
 
-bool writeJsonToFile(const nlohmann::json& obj,
+void writeJsonToFile(const nlohmann::json& obj,
                      const std::string& out_p,
                      const std::string& out_p_def) noexcept {
 	if (writeJsonToFile(obj, out_p)) {
-		return true;
+		return;
 	}
-	return writeJsonToFile(obj, out_p_def);
+	writeJsonToFile(obj, out_p_def);
 }
 
 } // namespace
@@ -201,13 +200,8 @@ void Config::setDefaultValues() noexcept {
 	}
 }
 
-void Config::initValuesFromConfOrDefs(const std::string& config_path) noexcept {
-	setDefaultValues(); // will be overridden by config file values exist any
-	std::error_code err_c;
-	if (!std::filesystem::exists(config_path, err_c)) {
-		const auto conf_values = getJsonValues();
-		writeJsonToFile(conf_values, config_path, "generated_conf.json");
-	}
+void Config::initValuesFromConfIfValid(
+    const std::string& config_path) noexcept {
 	try {
 		using json = nlohmann::json;
 		std::ifstream in_stream(config_path);
@@ -219,98 +213,84 @@ void Config::initValuesFromConfOrDefs(const std::string& config_path) noexcept {
 		json config = json::parse(in_stream, nullptr, false /*nothrow*/,
 		                          true /*ignore comments*/);
 		if (config.contains(Key::connect_period_seconds)) {
-			m_connect_period = std::chrono::seconds(
-			    config[Key::connect_period_seconds].get<int>());
-		} else {
-			m_connect_period = std::chrono::seconds(60);
+			const auto tmp = std::chrono::seconds(
+			    config[Key::connect_period_seconds].get<unsigned>());
+			if (tmp.count() > 0 && tmp.count() < 10000) {
+				m_connect_period = tmp;
+			}
 		}
 
 		if (config.contains(Key::check_period_seconds)) {
-			m_check_period = std::chrono::seconds(
-			    config[Key::check_period_seconds].get<int>());
-		} else {
-			m_check_period = std::chrono::seconds(10);
+			const auto tmp = std::chrono::seconds(
+			    config[Key::check_period_seconds].get<unsigned>());
+			if (tmp.count() > 0 &&
+			    tmp.count() <= m_connect_period.count() / 2) {
+				m_check_period = tmp;
+			}
 		}
 
 		if (config.contains(Key::max_retries_num)) {
-			m_max_retries_num = config[Key::max_retries_num].get<std::size_t>();
-		} else {
-			m_max_retries_num = 10;
+			const auto tmp = config[Key::max_retries_num].get<unsigned>();
+			if (tmp > 0 && tmp < 10000) {
+				m_max_retries_num = tmp;
+			}
 		}
 
 		if (config.contains(Key::reconnection_delay_minutes)) {
-			m_reconnection_delay = std::chrono::minutes(
-			    config[Key::reconnection_delay_minutes].get<int>());
-		} else {
-			m_reconnection_delay = std::chrono::minutes(20 * 60);
+			const auto tmp = std::chrono::minutes(
+			    config[Key::reconnection_delay_minutes].get<unsigned>());
+			if (tmp.count() > 5 && tmp.count() < 23 * 60 + 55) {
+				m_reconnection_delay = tmp;
+			}
 		}
 
 		if (config.contains(Key::stats_flush_period_seconds)) {
-			m_stats_flush_period = std::chrono::seconds(
-			    config[Key::stats_flush_period_seconds].get<int>());
-		} else {
-			m_stats_flush_period = std::chrono::seconds(40);
+			const auto tmp = std::chrono::seconds(
+			    config[Key::stats_flush_period_seconds].get<unsigned>());
+			if (tmp.count() > 0 && tmp.count() < m_connect_period.count()) {
+				m_stats_flush_period = tmp;
+			}
 		}
-
 		if (config.contains(Key::max_threads_num)) {
-			m_max_threads_num = config[Key::max_threads_num].get<std::size_t>();
-		} else {
-			m_max_threads_num =
-			    (std::thread::hardware_concurrency() + 1) * 3 / 4;
+			m_max_threads_num = config[Key::max_threads_num].get<unsigned>();
 		}
 
 		if (config.contains(Key::streams) && config[Key::streams].is_array()) {
-			m_streams_list =
+			m_streams_list = // check this too
 			    config[Key::streams].get<std::vector<std::string>>();
-		} else {
-			m_streams_list = {"btcusdt@trade", "ethusdt@trade",
-			                  "bnbusdt@trade"};
 		}
 
-		if (config.contains(Key::host)) {
+		if (config.contains(Key::host)) { // also check this
 			m_host_name = config[Key::host].get<std::string>();
-		} else {
-			m_host_name = "stream.binance.com";
 		}
 
-		if (config.contains(Key::port)) {
+		if (config.contains(Key::port)) { /// and this
 			m_port = config[Key::port].get<std::string>();
-		} else {
-			m_port = "9443";
 		}
 	} catch (const nlohmann::json::exception& err) {
 		std::cerr << "Error parsing JSON config: " << err.what() << std::endl;
 	} catch (const std::exception& err) {
 		std::cerr << "Unexpected err when parsing: " << err.what() << std::endl;
 	}
-	m_connect_period = std::chrono::seconds(60);
-	m_check_period = std::chrono::seconds(10);
-	m_max_retries_num = 10;
-	m_reconnection_delay = std::chrono::minutes(20 * 60);
-	m_stats_flush_period = std::chrono::seconds(40);
-	m_stats_output_path = m_po_var_map[Key::stats_path].as<std::string>();
-	m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
-	m_streams_list = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
-	m_host_name = "stream.binance.com";
-	m_port = "9443";
 }
 
 void Config::dumpValidConfValues(
     const std::string& config_path) const noexcept {
-	// write the valid config values to config file
+	const auto conf_values = getJsonValues();
+	writeJsonToFile(conf_values, config_path, "generated_conf.json");
 }
 
-bool Config::updateConfig() noexcept {
-	try {
-		auto config_path = getConfigPath(m_po_var_map);
-		initValuesFromCli();
-		initValuesFromConfOrDefs(config_path);
+void Config::updateConfig() noexcept {
+	auto config_path = getConfigPath(m_po_var_map);
+	initValuesFromCli(); // will not be changed if set
+	setDefaultValues();  // will be overridden by config values exist any
+	std::error_code err_c; // need this way to have no throw
+	if (!std::filesystem::exists(config_path, err_c)) {
 		dumpValidConfValues(config_path);
-	} catch (const std::exception& err) {
-		std::cerr << "Error updating config: " << err.what() << std::endl;
-		return false;
+		return;
 	}
-	return true;
+	initValuesFromConfIfValid(config_path);
+	dumpValidConfValues(config_path);
 }
 
 bool Config::isHelp() const noexcept {

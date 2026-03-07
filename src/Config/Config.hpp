@@ -2,7 +2,7 @@
 #include <boost/program_options.hpp>
 #include <memory>
 #include <string_view>
-#include "json.hpp"
+#include "../thirdparty/nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 
 namespace Config {
@@ -17,7 +17,7 @@ public:
 	static std::unique_ptr<Config>& getInstance();
 
 	bool init(int argc, char* argv[]) noexcept;
-	bool updateConfig() noexcept;
+	void updateConfig() noexcept;
 	bool initLogger() const noexcept;
 
 	bool isHelp() const noexcept;
@@ -58,7 +58,7 @@ private:
 private:
 	spdlog::level::level_enum getLogLevel() const noexcept;
 	void initValuesFromCli() noexcept;
-	void initValuesFromConfOrDefs(const std::string& config_path) noexcept;
+	void initValuesFromConfIfValid(const std::string& config_path) noexcept;
 	void dumpValidConfValues(const std::string& config_path) const noexcept;
 	void setDefaultValues() noexcept;
 	nlohmann::json getJsonValues() const noexcept;
