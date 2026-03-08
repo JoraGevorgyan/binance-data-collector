@@ -18,7 +18,7 @@ public:
 
 	bool init(int argc, char* argv[]) noexcept;
 	void updateConfig() noexcept;
-	bool initLogger() const noexcept;
+	bool initLogger() noexcept;
 
 	bool isHelp() const noexcept;
 	bool isDebugMode() const noexcept;

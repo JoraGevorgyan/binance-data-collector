@@ -187,7 +187,7 @@ bool Config::init(int argc, char* argv[]) noexcept {
 	return true;
 }
 
-bool Config::initLogger() const noexcept {
+bool Config::initLogger() noexcept {
 	if (m_logger != nullptr) {
 		m_logger->set_level(m_log_level.value());
 		return true;
@@ -203,13 +203,13 @@ bool Config::initLogger() const noexcept {
 			    "tmp_log_for_nth.log", true);
 		}
 
-		auto logger =
+		m_logger =
 		    std::make_shared<spdlog::logger>("binance-data-collector", sink);
-		logger->set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
-		logger->set_level(log_level);
-		logger->flush_on(log_level);
-		spdlog::register_logger(logger);
-		spdlog::set_default_logger(logger);
+		m_logger->set_pattern("[%Y-%m-%d %H:%M:%S](tid:%t) [%^%l%$] %v");
+		m_logger->set_level(log_level);
+		m_logger->flush_on(log_level);
+		spdlog::register_logger(m_logger);
+		spdlog::set_default_logger(m_logger);
 	} catch (const spdlog::spdlog_ex& err) {
 		std::cerr << "Error initializing logger: " << err.what() << std::endl;
 		return false;
