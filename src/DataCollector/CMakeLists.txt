@@ -14,4 +14,3 @@ target_link_libraries(
 		OpenSSL::Crypto
 		${LOGGER_NAME}
 )
-

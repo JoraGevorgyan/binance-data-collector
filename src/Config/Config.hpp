@@ -2,7 +2,7 @@
 #include <boost/program_options.hpp>
 #include <memory>
 #include <string_view>
-#include "../thirdparty/nlohmann/json.hpp"
+#include "../../thirdparty/nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 
 namespace Config {
