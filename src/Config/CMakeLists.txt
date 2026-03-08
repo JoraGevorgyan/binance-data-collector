@@ -11,9 +11,8 @@ target_compile_definitions(
 )
 
 target_link_libraries(
-    ${NAME}
-    PRIVATE
+	${NAME}
+	PRIVATE
 		${LOGGER_NAME}
 		Boost::program_options
 )
-

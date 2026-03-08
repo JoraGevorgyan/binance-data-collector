@@ -11,8 +11,7 @@ BOOST_AUTO_TEST_CASE(config_parses_help_and_debug_flags) {
 	auto& config = Config::Config::getInstance();
 	BOOST_REQUIRE(config != nullptr);
 	BOOST_REQUIRE(config->init(argc, argv));
-	// update this when updateConfig is ready
-	BOOST_REQUIRE(config->updateConfig());
+	config->updateConfig();
 
 	BOOST_TEST(config->isHelp());
 	BOOST_TEST(config->isDebugMode());

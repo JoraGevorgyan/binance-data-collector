@@ -7,7 +7,7 @@
 #include <sstream>
 #include <thread>
 #include <vector>
-#include "json.hpp"
+#include "../../../thirdparty/nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
 
 namespace DataCollector {
@@ -17,7 +17,8 @@ namespace {
 std::string formatTimestamp(
     std::chrono::system_clock::time_point t_point) noexcept {
 	const auto to_time = std::chrono::system_clock::to_time_t(t_point);
-	const auto tm = *std::gmtime(&to_time);
+	std::tm tm{};
+	gmtime_r(&to_time, &tm); // thread-safe on Linux
 	std::ostringstream oss;
 	oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
 	return oss.str();
@@ -52,28 +53,28 @@ Aggregator::Aggregator(std::chrono::seconds flush_period,
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {
 	{
-		spdlog::debug("Parsing message: {}", message);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-		TradeEvent result;
-		nlohmann::json js_obj = nlohmann::json::parse(message, nullptr, false);
-		if (js_obj.is_discarded()) {
-			spdlog::warn("Discarded malformed JSON");
-			return std::nullopt;
-		}
-
-		if (!js_obj.contains("data") || !js_obj["data"].is_object()) {
-			spdlog::warn("Missing data field");
-			return std::nullopt;
-		}
-
-		const auto& d = js_obj["data"];
-		if (!d.contains("s") || !d.contains("p") || !d.contains("q") ||
-		    !d.contains("m")) {
-			spdlog::warn("Missing required trade fields");
-			return std::nullopt;
-		}
-
 		try {
+			spdlog::debug("Parsing message: {}", message);
+			TradeEvent result;
+			nlohmann::json js_obj =
+			    nlohmann::json::parse(message, nullptr, false);
+			if (js_obj.is_discarded()) {
+				spdlog::warn("Discarded malformed JSON");
+				return std::nullopt;
+			}
+
+			if (!js_obj.contains("data") || !js_obj["data"].is_object()) {
+				spdlog::warn("Missing data field");
+				return std::nullopt;
+			}
+
+			const auto& d = js_obj["data"];
+			if (!d.contains("s") || !d.contains("p") || !d.contains("q") ||
+			    !d.contains("m")) {
+				spdlog::warn("Missing required trade fields");
+				return std::nullopt;
+			}
+
 			result.symbol = d.value("s", "");
 			result.price = std::stod(d.value("p", "0"));
 			result.quantity = std::stod(d.value("q", "0"));
