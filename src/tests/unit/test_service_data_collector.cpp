@@ -14,7 +14,7 @@ Config::Config& getInitializedConfig() {
 		constexpr int argc = static_cast<int>(sizeof(argv) / sizeof(argv[0]));
 
 		BOOST_REQUIRE(config_ptr->init(argc, argv));
-		BOOST_REQUIRE(config_ptr->updateConfig());
+		config_ptr->updateConfig();
 		initialized = true;
 	}
 

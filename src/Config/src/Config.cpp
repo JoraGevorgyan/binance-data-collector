@@ -131,8 +131,7 @@ std::unique_ptr<Config>& Config::getInstance() {
 }
 
 nlohmann::json Config::getJsonValues() const noexcept {
-	using json = nlohmann::json;
-	json res{};
+	nlohmann::json res{};
 
 	res[Key::log_level] = logLvlToString(m_log_level.value());
 	res[Key::stats_path] = m_stats_output_path.value();
@@ -244,15 +243,14 @@ void Config::setDefaultValues() noexcept {
 void Config::initValuesFromConfIfValid(
     const std::string& config_path) noexcept {
 	try {
-		using json = nlohmann::json;
 		std::ifstream in_stream(config_path);
 		if (!in_stream.is_open()) {
 			std::cerr << "Failed to open config file: " << config_path
 			          << std::endl;
 			return;
 		}
-		json config = json::parse(in_stream, nullptr, false /*nothrow*/,
-		                          true /*ignore comments*/);
+		nlohmann::json config = nlohmann::json::parse(
+		    in_stream, nullptr, false /*nothrow*/, true /*ignore comments*/);
 
 		if (config.contains(Key::log_level)) {
 			m_log_level =
@@ -332,7 +330,7 @@ void Config::dumpValidConfValues(
 void Config::updateConfig() noexcept {
 	auto config_path = getConfigPath(m_po_var_map);
 	initValuesFromCli();   // will not be changed if set
-	setDefaultValues();    // will be overridden by config values exist any
+	setDefaultValues();    // will be overridden by config values if exist any
 	std::error_code err_c; // need this way to have no throw
 	if (!std::filesystem::exists(config_path, err_c)) {
 		dumpValidConfValues(config_path);
