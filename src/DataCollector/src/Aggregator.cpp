@@ -24,31 +24,14 @@ std::string formatTimestamp(
 	return oss.str();
 }
 
-std::optional<std::filesystem::path> getValidFullPath(
-    const std::string& path) noexcept {
-	namespace fs = std::filesystem;
-	std::error_code err_c;
-	const fs::path full_path(path);
-	const fs::path dir_path = full_path.parent_path();
-
-	if (!dir_path.empty() && !fs::exists(dir_path, err_c)) {
-		if (!fs::create_directories(dir_path, err_c) && err_c) {
-			spdlog::error("Failed to create directory {}: {}",
-			              dir_path.string(), err_c.message());
-			return std::nullopt;
-		}
-	}
-	return full_path;
-}
-
 } // namespace
 
-Aggregator::Aggregator(std::chrono::seconds flush_period,
-                       std::string output_path,
-                       Canceler::Canceler& canceler)
-    : m_flush_period(flush_period),
-      m_flush_out_path(std::move(output_path)),
-      m_canceler(canceler) {}
+Aggregator::Aggregator(Canceler::Canceler& canceler,
+                       const std::weak_ptr<spdlog::logger>& out,
+                       std::chrono::seconds flush_period)
+    : m_canceler(canceler),
+      m_out(out.lock()),
+      m_flush_period(flush_period) {}
 
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {
@@ -93,24 +76,15 @@ void Aggregator::update(const TradeEvent& event_msg) noexcept {
 	stats.min_price = std::min(stats.min_price, event_msg.price);
 	stats.max_price = std::max(stats.max_price, event_msg.price);
 	if (event_msg.is_buyer_or_maker) {
-		stats.sell_count += 1; // seller-initiated
+		stats.sell_count += 1;
 	} else {
-		stats.buy_count += 1; // buyer-initiated
+		stats.buy_count += 1;
 	}
-}
-
-bool Aggregator::isStreamAvailable() noexcept {
-	if (m_out.is_open()) {
-		return true;
-	}
-	const auto full_path = getValidFullPath(m_flush_out_path);
-	m_out.open(full_path.value_or("statistics.log"), std::ios::app);
-	return m_out.is_open();
 }
 
 bool Aggregator::writeSnapshotSync() noexcept {
-	if (!isStreamAvailable()) {
-		spdlog::critical("cannot dump statistics to a file");
+	if (m_out == nullptr) {
+		spdlog::critical("impossible(inited and checked in config)");
 		return false;
 	}
 	std::unordered_map<std::string, TradeStatistics> cur_stats;
@@ -123,17 +97,17 @@ bool Aggregator::writeSnapshotSync() noexcept {
 	}
 
 	const auto timestamp = formatTimestamp(std::chrono::system_clock::now());
-	m_out << "timestamp=" << timestamp << '\n';
+	m_out->info("timestamp={}", timestamp);
 
 	for (const auto& entry : cur_stats) {
 		const std::string& symbol = entry.first;
 		const TradeStatistics& tmp_s = entry.second;
-		m_out << "symbol=" << symbol << " trades=" << tmp_s.trades
-		      << " volume=" << tmp_s.volume << " min=" << tmp_s.min_price
-		      << " max=" << tmp_s.max_price << " buy=" << tmp_s.buy_count
-		      << " sell=" << tmp_s.sell_count << '\n';
+		m_out->info(
+		    "symbol={} trades={} volume={} min={} max={} buy={} sell={}",
+		    symbol, tmp_s.trades, tmp_s.volume, tmp_s.min_price,
+		    tmp_s.max_price, tmp_s.buy_count, tmp_s.sell_count);
 	}
-	m_out.flush();
+	m_out->flush();
 	return true;
 }
 

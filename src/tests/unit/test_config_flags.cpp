@@ -15,7 +15,7 @@ BOOST_AUTO_TEST_CASE(config_parses_help_and_debug_flags) {
 
 	BOOST_TEST(config->isHelp());
 	BOOST_TEST(config->isDebugMode());
-	BOOST_TEST(config->getServiceName() == "binance-data-collector-service");
+	BOOST_TEST(config->getServiceName() == "binance-data-collector");
 	BOOST_TEST(config->getServiceDisplayName() ==
 	           "Binance Data Collector Service");
 

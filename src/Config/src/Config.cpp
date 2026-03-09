@@ -3,11 +3,17 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/rotating_file_sink.h"
 
 namespace Config {
 
 namespace {
+
+constexpr auto def_log_name = "bca_service.log";
+constexpr auto def_stats_name = "bca_statistics.log";
+constexpr std::size_t megabytes = 1024 * 1024;
+constexpr std::size_t def_max_log_size_mb = 10 * megabytes;
+constexpr std::size_t def_max_log_files_num = 4;
 
 namespace Key {
 
@@ -23,6 +29,8 @@ constexpr auto max_retries_num = "max-retries-num";
 constexpr auto stats_flush_period_seconds = "stats-flush-period-seconds";
 constexpr auto reconnection_delay_minutes = "reconnection-delay-minutes";
 constexpr auto max_threads_num = "max-threads-num";
+constexpr auto max_log_size = "max-log-size-megabytes";
+constexpr auto max_log_files_num = "max-log-files-num";
 constexpr auto streams = "streams";
 constexpr auto host = "host";
 constexpr auto port = "port";
@@ -85,6 +93,7 @@ bool writeJsonToFile(const nlohmann::json& obj,
 		std::ofstream ofs_out(out_p, std::ios::out | std::ios::trunc);
 		if (ofs_out.is_open()) {
 			ofs_out << obj.dump(4);
+			ofs_out << std::endl;
 			ofs_out.close();
 			return true;
 		}
@@ -104,6 +113,19 @@ void writeJsonToFile(const nlohmann::json& obj,
 		return;
 	}
 	writeJsonToFile(obj, out_p_def);
+}
+
+std::shared_ptr<spdlog::logger> initFlusherLogger(const std::string& file_path,
+                                                  std::size_t max_size,
+                                                  std::size_t max_num) {
+	auto sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+	    file_path, max_size, max_num);
+	auto stats_logger =
+	    std::make_shared<spdlog::logger>("bca_flusher_logger", sink);
+	stats_logger->set_pattern("%v");
+	stats_logger->flush_on(spdlog::level::critical);
+	spdlog::register_logger(stats_logger);
+	return stats_logger;
 }
 
 } // namespace
@@ -141,6 +163,8 @@ nlohmann::json Config::getJsonValues() const noexcept {
 	res[Key::stats_flush_period_seconds] = m_stats_flush_period.count();
 	res[Key::reconnection_delay_minutes] = m_reconnection_delay.count();
 	res[Key::max_threads_num] = m_max_threads_num;
+	res[Key::max_log_size] = m_max_log_size / megabytes;
+	res[Key::max_log_files_num] = m_max_log_files_num;
 	res[Key::streams] = m_streams_list;
 	res[Key::host] = m_host_name;
 	res[Key::port] = m_port;
@@ -161,14 +185,15 @@ bool Config::init(int argc, char* argv[]) noexcept {
 		m_po_desc.add_options()(Key::help, "produce help message")(
 		    Key::config, po::value<std::string>()->default_value("config.json"),
 		    "path to config file")(
-		    Key::log_path, po::value<std::string>()->default_value("cur.log"),
+		    Key::log_path,
+		    po::value<std::string>()->default_value(def_log_name),
 		    "path to log file")(
 		    Key::log_level, po::value<std::string>()->default_value("info"),
 		    "log level (trace, debug, info, warn, error, critical, off)")(
 		    Key::debug, po::bool_switch()->default_value(false),
 		    "enable debug mode (overrides log level to debug)")(
 		    Key::stats_path,
-		    po::value<std::string>()->default_value("statistics.log"),
+		    po::value<std::string>()->default_value(def_stats_name),
 		    "path to statistics output file");
 
 		po::store(po::parse_command_line(argc, argv, m_po_desc), m_po_var_map);
@@ -198,8 +223,9 @@ bool Config::initLogger() noexcept {
 			log_level = spdlog::level::debug;
 			sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 		} else {
-			sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-			    m_log_path.value_or("bca_service.log"), true);
+			sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+			    m_log_path.value_or(def_log_name), m_max_log_size,
+			    m_max_log_files_num);
 		}
 
 		m_logger =
@@ -209,6 +235,10 @@ bool Config::initLogger() noexcept {
 		m_logger->flush_on(log_level);
 		spdlog::register_logger(m_logger);
 		spdlog::set_default_logger(m_logger);
+
+		m_stats_logger =
+		    initFlusherLogger(m_stats_output_path.value_or(def_stats_name),
+		                      m_max_log_size, m_max_log_files_num);
 	} catch (const spdlog::spdlog_ex& err) {
 		std::cerr << "Error initializing logger: " << err.what() << std::endl;
 		return false;
@@ -221,13 +251,13 @@ bool Config::initLogger() noexcept {
 
 void Config::setDefaultValues() noexcept {
 	if (!m_log_path.has_value()) {
-		m_log_path = "current.log";
+		m_log_path = def_log_name;
 	}
 	if (!m_log_level.has_value()) {
 		m_log_level = spdlog::level::info;
 	}
 	if (!m_stats_output_path.has_value()) {
-		m_stats_output_path = "statistics.log";
+		m_stats_output_path = def_stats_name;
 	}
 	m_connect_period = std::chrono::seconds(60);
 	m_check_period = std::chrono::seconds(10);
@@ -235,6 +265,8 @@ void Config::setDefaultValues() noexcept {
 	m_stats_flush_period = std::chrono::seconds(40);
 	m_reconnection_delay = std::chrono::minutes(20 * 60);
 	m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
+	m_max_log_size = def_max_log_size_mb;
+	m_max_log_files_num = def_max_log_files_num;
 	m_streams_list = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
 	m_host_name = "stream.binance.com";
 	m_port = "9443";
@@ -302,6 +334,20 @@ void Config::initValuesFromConfIfValid(
 			m_max_threads_num = config[Key::max_threads_num].get<unsigned>();
 		}
 
+		if (config.contains(Key::max_log_size)) {
+			const auto tmp = config[Key::max_log_size].get<unsigned>();
+			if (tmp > 0) {
+				m_max_log_size = tmp * megabytes;
+			}
+		}
+
+		if (config.contains(Key::max_log_files_num)) {
+			const auto tmp = config[Key::max_log_files_num].get<unsigned>();
+			if (tmp > 0) {
+				m_max_log_files_num = tmp;
+			}
+		}
+
 		if (config.contains(Key::streams) && config[Key::streams].is_array()) {
 			m_streams_list = // check this too
 			    config[Key::streams].get<std::vector<std::string>>();
@@ -331,7 +377,7 @@ void Config::updateConfig() noexcept {
 	auto config_path = getConfigPath(m_po_var_map);
 	initValuesFromCli();   // will not be changed if set
 	setDefaultValues();    // will be overridden by config values if exist any
-	std::error_code err_c; // need this way to have no throw
+	std::error_code err_c; // need this way to have no exception
 	if (!std::filesystem::exists(config_path, err_c)) {
 		dumpValidConfValues(config_path);
 		return;
@@ -341,6 +387,10 @@ void Config::updateConfig() noexcept {
 	if (m_logger != nullptr) {
 		m_logger->set_level(m_log_level.value());
 	}
+}
+
+std::shared_ptr<spdlog::logger> Config::getStatsLogger() const noexcept {
+	return m_stats_logger;
 }
 
 bool Config::isHelp() const noexcept {
@@ -356,7 +406,7 @@ bool Config::isDebugMode() const noexcept {
 }
 
 std::string_view Config::getServiceName() const noexcept {
-	return "binance-data-collector-service";
+	return "binance-data-collector";
 }
 
 std::string_view Config::getServiceDisplayName() const noexcept {
@@ -380,10 +430,6 @@ std::chrono::seconds Config::getStatsFlushPeriod() const noexcept {
 
 std::chrono::minutes Config::getReconnectionDelay() const noexcept {
 	return m_reconnection_delay;
-}
-
-std::string Config::getStatsOutputPath() const noexcept {
-	return m_stats_output_path.value_or("statistics.log");
 }
 
 std::size_t Config::getMaxThreadsNum() const noexcept {

@@ -24,11 +24,11 @@ this would be done by package creation and installation in future
 ```bash
 sudo cmake --build BUILD_DIR --target install
 sudo systemctl daemon-reload
-sudo systemctl enable --now binance-data-collector-service
+sudo systemctl enable --now binance-data-collector
 ```
 
 Installed files:
 
 - Binary: `/usr/local/bin/binance-data-collector` (or `${CMAKE_INSTALL_PREFIX}/bin/binance-data-collector`)
 - Config: `/etc/binance-data-collector/config.yaml`
-- Unit: `/etc/systemd/system/binance-data-collector-service.service`
+- Unit: `/etc/systemd/system/binance-data-collector.service`
