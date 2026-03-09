@@ -2,12 +2,14 @@
 #include <chrono>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include "../common/Canceler.hpp"
+#include "spdlog/spdlog.h"
 
 namespace DataCollector {
 
@@ -38,14 +40,10 @@ struct TradeEvent {
 
 class Aggregator {
 public:
-	explicit Aggregator(std::chrono::seconds flush_period,
-	                    std::string output_path,
-	                    Canceler::Canceler& canceler);
-	~Aggregator() {
-		if (m_out.is_open()) {
-			m_out.close();
-		}
-	}
+	explicit Aggregator(Canceler::Canceler& canceler,
+	                    const std::weak_ptr<spdlog::logger>& out,
+	                    std::chrono::seconds flush_period);
+	~Aggregator() = default;
 
 	[[nodiscard]] static std::optional<TradeEvent> parseTradeEvent(
 	    const std::string& message) noexcept;
@@ -53,17 +51,15 @@ public:
 	void update(const TradeEvent& event_msg) noexcept;
 
 private:
-	const std::chrono::seconds m_flush_period;
-	const std::string m_flush_out_path;
 	Canceler::Canceler& m_canceler;
-	std::ofstream m_out;
+	std::shared_ptr<spdlog::logger> m_out;
+	const std::chrono::seconds m_flush_period;
 	std::unordered_map<std::string, TradeStatistics> m_statistics;
 	std::mutex m_mutex;
 
 private:
 	bool writeSnapshotSync() noexcept;
 	void flushWorker() noexcept;
-	bool isStreamAvailable() noexcept;
 };
 
 } // namespace DataCollector

@@ -53,9 +53,8 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 	spdlog::info("Trying to create a session");
 	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
 
-	DataCollector::Aggregator aggregator(m_config.getStatsFlushPeriod(),
-	                                     m_config.getStatsOutputPath(),
-	                                     m_canceler);
+	DataCollector::Aggregator aggregator(m_canceler, m_config.getStatsLogger(),
+	                                     m_config.getStatsFlushPeriod());
 
 	auto flush_worker_thread = aggregator.startFlushWorker();
 	const auto workers_num = validateWorkersNum(m_config.getMaxThreadsNum());

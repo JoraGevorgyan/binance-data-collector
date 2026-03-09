@@ -406,7 +406,7 @@ bool Config::isDebugMode() const noexcept {
 }
 
 std::string_view Config::getServiceName() const noexcept {
-	return "binance-data-collector-service";
+	return "binance-data-collector";
 }
 
 std::string_view Config::getServiceDisplayName() const noexcept {
@@ -430,10 +430,6 @@ std::chrono::seconds Config::getStatsFlushPeriod() const noexcept {
 
 std::chrono::minutes Config::getReconnectionDelay() const noexcept {
 	return m_reconnection_delay;
-}
-
-std::string Config::getStatsOutputPath() const noexcept {
-	return m_stats_output_path.value_or(def_stats_name);
 }
 
 std::size_t Config::getMaxThreadsNum() const noexcept {

@@ -31,7 +31,6 @@ public:
 	std::size_t getMaxRetriesNum() const noexcept;
 	std::chrono::minutes getReconnectionDelay() const noexcept;
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
-	std::string getStatsOutputPath() const noexcept;
 	std::size_t getMaxThreadsNum() const noexcept;
 	std::vector<std::string> getStreamsList() const noexcept;
 	std::string getHostName() const noexcept;
