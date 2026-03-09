@@ -3,11 +3,14 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/rotating_file_sink.h"
 
 namespace Config {
 
 namespace {
+
+constexpr auto def_log_name = "bca_service.log";
+constexpr auto def_stats_name = "bca_statistics.log";
 
 namespace Key {
 
@@ -161,14 +164,15 @@ bool Config::init(int argc, char* argv[]) noexcept {
 		m_po_desc.add_options()(Key::help, "produce help message")(
 		    Key::config, po::value<std::string>()->default_value("config.json"),
 		    "path to config file")(
-		    Key::log_path, po::value<std::string>()->default_value("cur.log"),
+		    Key::log_path,
+		    po::value<std::string>()->default_value(def_log_name),
 		    "path to log file")(
 		    Key::log_level, po::value<std::string>()->default_value("info"),
 		    "log level (trace, debug, info, warn, error, critical, off)")(
 		    Key::debug, po::bool_switch()->default_value(false),
 		    "enable debug mode (overrides log level to debug)")(
 		    Key::stats_path,
-		    po::value<std::string>()->default_value("statistics.log"),
+		    po::value<std::string>()->default_value(def_stats_name),
 		    "path to statistics output file");
 
 		po::store(po::parse_command_line(argc, argv, m_po_desc), m_po_var_map);
@@ -198,8 +202,8 @@ bool Config::initLogger() noexcept {
 			log_level = spdlog::level::debug;
 			sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 		} else {
-			sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-			    m_log_path.value_or("bca_service.log"), true);
+			sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+			    m_log_path.value_or(def_log_name), 10 * 1024 * 1024, 3);
 		}
 
 		m_logger =
@@ -221,13 +225,13 @@ bool Config::initLogger() noexcept {
 
 void Config::setDefaultValues() noexcept {
 	if (!m_log_path.has_value()) {
-		m_log_path = "current.log";
+		m_log_path = def_log_name;
 	}
 	if (!m_log_level.has_value()) {
 		m_log_level = spdlog::level::info;
 	}
 	if (!m_stats_output_path.has_value()) {
-		m_stats_output_path = "statistics.log";
+		m_stats_output_path = def_stats_name;
 	}
 	m_connect_period = std::chrono::seconds(60);
 	m_check_period = std::chrono::seconds(10);
@@ -383,7 +387,7 @@ std::chrono::minutes Config::getReconnectionDelay() const noexcept {
 }
 
 std::string Config::getStatsOutputPath() const noexcept {
-	return m_stats_output_path.value_or("statistics.log");
+	return m_stats_output_path.value_or(def_stats_name);
 }
 
 std::size_t Config::getMaxThreadsNum() const noexcept {
