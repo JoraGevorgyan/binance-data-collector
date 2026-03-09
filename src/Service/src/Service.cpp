@@ -105,7 +105,7 @@ std::unique_ptr<Service>& Service::getInstance() {
 
 void Service::signalTerm(int sig_num) {
 	spdlog::info("Received termination signal: {}", sig_num);
-	if (sig_num == SIGABRT || sig_num == SIGSEGV || sig_num == SIGTERM) {
+	if (sig_num == SIGABRT || sig_num == SIGSEGV) {
 		spdlog::critical("Termination signal received: {}", sig_num);
 		signal(sig_num, SIG_DFL);
 		kill(getpid(), sig_num);
