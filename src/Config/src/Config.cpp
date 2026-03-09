@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include "spdlog/sinks/ostream_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 
 namespace Config {
@@ -113,6 +114,17 @@ void writeJsonToFile(const nlohmann::json& obj,
 	writeJsonToFile(obj, out_p_def);
 }
 
+std::shared_ptr<spdlog::logger> initFlusherLogger(std::ostream& out_stream) {
+	auto sink =
+	    std::make_shared<spdlog::sinks::ostream_sink_mt>(out_stream, false);
+	auto stats_logger =
+	    std::make_shared<spdlog::logger>("bca_flusher_logger", sink);
+	stats_logger->set_pattern("%v");
+	stats_logger->flush_on(spdlog::level::off);
+	spdlog::register_logger(stats_logger);
+	return stats_logger;
+}
+
 } // namespace
 
 std::unique_ptr<Config> Config::m_instance = nullptr;
@@ -209,7 +221,8 @@ bool Config::initLogger() noexcept {
 			sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 		} else {
 			sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-			    m_log_path.value_or(def_log_name), m_max_log_size, m_max_log_files_num);
+			    m_log_path.value_or(def_log_name), m_max_log_size,
+			    m_max_log_files_num);
 		}
 
 		m_logger =
@@ -357,7 +370,7 @@ void Config::updateConfig() noexcept {
 	auto config_path = getConfigPath(m_po_var_map);
 	initValuesFromCli();   // will not be changed if set
 	setDefaultValues();    // will be overridden by config values if exist any
-	std::error_code err_c; // need this way to have no throw
+	std::error_code err_c; // need this way to have no exception
 	if (!std::filesystem::exists(config_path, err_c)) {
 		dumpValidConfValues(config_path);
 		return;
@@ -367,6 +380,10 @@ void Config::updateConfig() noexcept {
 	if (m_logger != nullptr) {
 		m_logger->set_level(m_log_level.value());
 	}
+}
+
+std::shared_ptr<spdlog::logger> Config::getStatsLogger() const noexcept {
+	return m_stats_logger;
 }
 
 bool Config::isHelp() const noexcept {
@@ -414,14 +431,6 @@ std::string Config::getStatsOutputPath() const noexcept {
 
 std::size_t Config::getMaxThreadsNum() const noexcept {
 	return m_max_threads_num;
-}
-
-std::size_t Config::getMaxLogSize() const noexcept {
-	return m_max_log_size;
-}
-
-std::size_t Config::getMaxLogFilesNum() const noexcept {
-	return m_max_log_files_num;
 }
 
 std::vector<std::string> Config::getStreamsList() const noexcept {

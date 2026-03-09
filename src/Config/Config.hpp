@@ -33,17 +33,17 @@ public:
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
 	std::string getStatsOutputPath() const noexcept;
 	std::size_t getMaxThreadsNum() const noexcept;
-	std::size_t getMaxLogSize() const noexcept;
-	std::size_t getMaxLogFilesNum() const noexcept;
 	std::vector<std::string> getStreamsList() const noexcept;
 	std::string getHostName() const noexcept;
 	std::string getPort() const noexcept;
+	std::shared_ptr<spdlog::logger> getStatsLogger() const noexcept;
 
 private:
 	static std::unique_ptr<Config> m_instance;
 	po::variables_map m_po_var_map;
 	po::options_description m_po_desc{"Allowed options"};
 	std::shared_ptr<spdlog::logger> m_logger;
+	std::shared_ptr<spdlog::logger> m_stats_logger;
 
 	std::optional<spdlog::level::level_enum> m_log_level;
 	std::optional<std::string> m_log_path;
