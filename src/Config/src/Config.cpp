@@ -11,6 +11,8 @@ namespace {
 
 constexpr auto def_log_name = "bca_service.log";
 constexpr auto def_stats_name = "bca_statistics.log";
+constexpr std::size_t def_max_log_size_mb = 10;
+constexpr std::size_t def_max_log_files_num = 4;
 
 namespace Key {
 
@@ -26,6 +28,8 @@ constexpr auto max_retries_num = "max-retries-num";
 constexpr auto stats_flush_period_seconds = "stats-flush-period-seconds";
 constexpr auto reconnection_delay_minutes = "reconnection-delay-minutes";
 constexpr auto max_threads_num = "max-threads-num";
+constexpr auto max_log_size = "max-log-size-megabytes";
+constexpr auto max_log_files_num = "max-log-files-num";
 constexpr auto streams = "streams";
 constexpr auto host = "host";
 constexpr auto port = "port";
@@ -144,6 +148,8 @@ nlohmann::json Config::getJsonValues() const noexcept {
 	res[Key::stats_flush_period_seconds] = m_stats_flush_period.count();
 	res[Key::reconnection_delay_minutes] = m_reconnection_delay.count();
 	res[Key::max_threads_num] = m_max_threads_num;
+	res[Key::max_log_size] = m_max_log_size;
+	res[Key::max_log_files_num] = m_max_log_files_num;
 	res[Key::streams] = m_streams_list;
 	res[Key::host] = m_host_name;
 	res[Key::port] = m_port;
@@ -203,7 +209,7 @@ bool Config::initLogger() noexcept {
 			sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 		} else {
 			sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-			    m_log_path.value_or(def_log_name), 10 * 1024 * 1024, 3);
+			    m_log_path.value_or(def_log_name), m_max_log_size, m_max_log_files_num);
 		}
 
 		m_logger =
@@ -239,6 +245,8 @@ void Config::setDefaultValues() noexcept {
 	m_stats_flush_period = std::chrono::seconds(40);
 	m_reconnection_delay = std::chrono::minutes(20 * 60);
 	m_max_threads_num = (std::thread::hardware_concurrency() + 1) * 3 / 4;
+	m_max_log_size = def_max_log_size_mb;
+	m_max_log_files_num = def_max_log_files_num;
 	m_streams_list = {"btcusdt@trade", "ethusdt@trade", "bnbusdt@trade"};
 	m_host_name = "stream.binance.com";
 	m_port = "9443";
@@ -304,6 +312,20 @@ void Config::initValuesFromConfIfValid(
 
 		if (config.contains(Key::max_threads_num)) {
 			m_max_threads_num = config[Key::max_threads_num].get<unsigned>();
+		}
+
+		if (config.contains(Key::max_log_size)) {
+			const auto tmp = config[Key::max_log_size].get<unsigned>();
+			if (tmp > 0) {
+				m_max_log_size = tmp;
+			}
+		}
+
+		if (config.contains(Key::max_log_files_num)) {
+			const auto tmp = config[Key::max_log_files_num].get<unsigned>();
+			if (tmp > 0) {
+				m_max_log_files_num = tmp;
+			}
 		}
 
 		if (config.contains(Key::streams) && config[Key::streams].is_array()) {
@@ -392,6 +414,14 @@ std::string Config::getStatsOutputPath() const noexcept {
 
 std::size_t Config::getMaxThreadsNum() const noexcept {
 	return m_max_threads_num;
+}
+
+std::size_t Config::getMaxLogSize() const noexcept {
+	return m_max_log_size;
+}
+
+std::size_t Config::getMaxLogFilesNum() const noexcept {
+	return m_max_log_files_num;
 }
 
 std::vector<std::string> Config::getStreamsList() const noexcept {

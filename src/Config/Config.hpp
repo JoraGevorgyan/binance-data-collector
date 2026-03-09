@@ -33,6 +33,8 @@ public:
 	std::chrono::seconds getStatsFlushPeriod() const noexcept;
 	std::string getStatsOutputPath() const noexcept;
 	std::size_t getMaxThreadsNum() const noexcept;
+	std::size_t getMaxLogSize() const noexcept;
+	std::size_t getMaxLogFilesNum() const noexcept;
 	std::vector<std::string> getStreamsList() const noexcept;
 	std::string getHostName() const noexcept;
 	std::string getPort() const noexcept;
@@ -55,6 +57,8 @@ private:
 	std::vector<std::string> m_streams_list;
 	std::string m_host_name;
 	std::string m_port;
+	std::size_t m_max_log_size;
+	std::size_t m_max_log_files_num;
 
 private:
 	spdlog::level::level_enum getLogLevel() const noexcept;
