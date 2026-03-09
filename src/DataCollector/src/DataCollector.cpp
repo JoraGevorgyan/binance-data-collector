@@ -37,7 +37,7 @@ std::string makeStreamPath(const std::vector<std::string>& streams) noexcept {
 std::size_t validateWorkersNum(std::size_t num) noexcept {
 	constexpr int busy_workers = 3; // main, flush worker, client session
 	if (num <= busy_workers) {
-		spdlog::warn("Max threads num {} is too low.");
+		spdlog::warn("Max threads num {} is too low.", num);
 		return 1;
 	}
 	return num - busy_workers;
