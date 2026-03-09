@@ -18,13 +18,16 @@ std::string_view ServiceBase::getDisplayName() const {
 
 int ServiceBase::onDebug() {
 	spdlog::info("Debugging service: {}", getDisplayName());
-	if (onStart()) {
-		auto debug = std::thread(&ServiceBase::doWork, this);
-		debug.join();
-		spdlog::info("Service {} exited: {}", getDisplayName(), m_exit_code);
+	m_exit_code = EXIT_FAILURE;
+	if (!onStart()) {
+		spdlog::error("Failed to start service {}", getDisplayName());
 		return m_exit_code;
 	}
-	return -1;
+
+	auto debug = std::thread(&ServiceBase::doWork, this);
+	debug.join();
+	spdlog::info("Service {} exited: {}", getDisplayName(), m_exit_code);
+	return m_exit_code;
 }
 
 } // namespace Service

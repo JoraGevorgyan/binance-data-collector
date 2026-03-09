@@ -71,6 +71,10 @@ void ServiceDataCollector::doMainWork() noexcept {
 		max_retries = m_config.getMaxRetriesNum();
 	}
 
+	if (m_canceler.isCanceled() && retries < max_retries) {
+		m_exit_code = EXIT_SUCCESS;
+	}
+
 	spdlog::info("Service {} is exiting...", m_display_name.c_str());
 }
 

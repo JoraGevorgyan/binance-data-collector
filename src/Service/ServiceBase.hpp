@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdlib>
 #include <string>
 #include <string_view>
 
@@ -26,7 +27,7 @@ public:
 protected:
 	const std::string m_name;
 	const std::string m_display_name;
-	int m_exit_code = 0;
+	int m_exit_code = EXIT_FAILURE;
 };
 
 } // namespace Service

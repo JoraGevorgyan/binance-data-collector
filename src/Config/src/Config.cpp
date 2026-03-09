@@ -199,7 +199,7 @@ bool Config::initLogger() noexcept {
 			sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 		} else {
 			sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-			    "tmp_log_for_nth.log", true);
+			    m_log_path.value_or("bca_service.log"), true);
 		}
 
 		m_logger =

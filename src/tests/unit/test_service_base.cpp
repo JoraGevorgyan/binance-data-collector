@@ -1,4 +1,5 @@
 #include <boost/test/unit_test.hpp>
+#include <cstdlib>
 #include "Service/ServiceBase.hpp"
 
 namespace {
@@ -45,5 +46,5 @@ BOOST_AUTO_TEST_CASE(service_base_on_debug_returns_worker_exit_code) {
 BOOST_AUTO_TEST_CASE(service_base_on_debug_fails_when_start_fails) {
 	FakeService service(false);
 
-	BOOST_TEST(service.onDebug() == -1);
+	BOOST_TEST(service.onDebug() == EXIT_FAILURE);
 }
