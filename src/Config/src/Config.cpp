@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include "spdlog/sinks/ostream_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 
 namespace Config {
@@ -12,7 +11,8 @@ namespace {
 
 constexpr auto def_log_name = "bca_service.log";
 constexpr auto def_stats_name = "bca_statistics.log";
-constexpr std::size_t def_max_log_size_mb = 10;
+constexpr std::size_t megabytes = 1024 * 1024;
+constexpr std::size_t def_max_log_size_mb = 10 * megabytes;
 constexpr std::size_t def_max_log_files_num = 4;
 
 namespace Key {
@@ -93,6 +93,7 @@ bool writeJsonToFile(const nlohmann::json& obj,
 		std::ofstream ofs_out(out_p, std::ios::out | std::ios::trunc);
 		if (ofs_out.is_open()) {
 			ofs_out << obj.dump(4);
+			ofs_out << std::endl;
 			ofs_out.close();
 			return true;
 		}
@@ -114,13 +115,15 @@ void writeJsonToFile(const nlohmann::json& obj,
 	writeJsonToFile(obj, out_p_def);
 }
 
-std::shared_ptr<spdlog::logger> initFlusherLogger(std::ostream& out_stream) {
-	auto sink =
-	    std::make_shared<spdlog::sinks::ostream_sink_mt>(out_stream, false);
+std::shared_ptr<spdlog::logger> initFlusherLogger(const std::string& file_path,
+                                                  std::size_t max_size,
+                                                  std::size_t max_num) {
+	auto sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+	    file_path, max_size, max_num);
 	auto stats_logger =
 	    std::make_shared<spdlog::logger>("bca_flusher_logger", sink);
 	stats_logger->set_pattern("%v");
-	stats_logger->flush_on(spdlog::level::off);
+	stats_logger->flush_on(spdlog::level::critical);
 	spdlog::register_logger(stats_logger);
 	return stats_logger;
 }
@@ -160,7 +163,7 @@ nlohmann::json Config::getJsonValues() const noexcept {
 	res[Key::stats_flush_period_seconds] = m_stats_flush_period.count();
 	res[Key::reconnection_delay_minutes] = m_reconnection_delay.count();
 	res[Key::max_threads_num] = m_max_threads_num;
-	res[Key::max_log_size] = m_max_log_size;
+	res[Key::max_log_size] = m_max_log_size / megabytes;
 	res[Key::max_log_files_num] = m_max_log_files_num;
 	res[Key::streams] = m_streams_list;
 	res[Key::host] = m_host_name;
@@ -232,6 +235,10 @@ bool Config::initLogger() noexcept {
 		m_logger->flush_on(log_level);
 		spdlog::register_logger(m_logger);
 		spdlog::set_default_logger(m_logger);
+
+		m_stats_logger =
+		    initFlusherLogger(m_stats_output_path.value_or(def_stats_name),
+		                      m_max_log_size, m_max_log_files_num);
 	} catch (const spdlog::spdlog_ex& err) {
 		std::cerr << "Error initializing logger: " << err.what() << std::endl;
 		return false;
@@ -330,7 +337,7 @@ void Config::initValuesFromConfIfValid(
 		if (config.contains(Key::max_log_size)) {
 			const auto tmp = config[Key::max_log_size].get<unsigned>();
 			if (tmp > 0) {
-				m_max_log_size = tmp;
+				m_max_log_size = tmp * megabytes;
 			}
 		}
 
