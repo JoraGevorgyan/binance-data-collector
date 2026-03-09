@@ -72,7 +72,6 @@ void ServiceDataCollector::doMainWork() noexcept {
 	}
 
 	spdlog::info("Service {} is exiting...", m_display_name.c_str());
-	m_exit_code = EXIT_SUCCESS;
 }
 
 } // namespace Service
