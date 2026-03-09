@@ -52,38 +52,35 @@ Aggregator::Aggregator(std::chrono::seconds flush_period,
 
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {
-	{
-		try {
-			spdlog::debug("Parsing message: {}", message);
-			TradeEvent result;
-			nlohmann::json js_obj =
-			    nlohmann::json::parse(message, nullptr, false);
-			if (js_obj.is_discarded()) {
-				spdlog::warn("Discarded malformed JSON");
-				return std::nullopt;
-			}
-
-			if (!js_obj.contains("data") || !js_obj["data"].is_object()) {
-				spdlog::warn("Missing data field");
-				return std::nullopt;
-			}
-
-			const auto& d = js_obj["data"];
-			if (!d.contains("s") || !d.contains("p") || !d.contains("q") ||
-			    !d.contains("m")) {
-				spdlog::warn("Missing required trade fields");
-				return std::nullopt;
-			}
-
-			result.symbol = d.value("s", "");
-			result.price = std::stod(d.value("p", "0"));
-			result.quantity = std::stod(d.value("q", "0"));
-			result.is_buyer_or_maker = d.value("m", true);
-			return result;
-		} catch (const std::exception& ex) {
-			spdlog::warn("Trade parse error: {}", ex.what());
+	try {
+		spdlog::debug("Parsing message: {}", message);
+		TradeEvent result;
+		nlohmann::json js_obj = nlohmann::json::parse(message, nullptr, false);
+		if (js_obj.is_discarded()) {
+			spdlog::warn("Discarded malformed JSON");
 			return std::nullopt;
 		}
+
+		if (!js_obj.contains("data") || !js_obj["data"].is_object()) {
+			spdlog::warn("Missing data field");
+			return std::nullopt;
+		}
+
+		const auto& d = js_obj["data"];
+		if (!d.contains("s") || !d.contains("p") || !d.contains("q") ||
+		    !d.contains("m")) {
+			spdlog::warn("Missing required trade fields");
+			return std::nullopt;
+		}
+
+		result.symbol = d.value("s", "");
+		result.price = std::stod(d.value("p", "0"));
+		result.quantity = std::stod(d.value("q", "0"));
+		result.is_buyer_or_maker = d.value("m", true);
+		return result;
+	} catch (const std::exception& ex) {
+		spdlog::warn("Trade parse error: {}", ex.what());
+		return std::nullopt;
 	}
 }
 
