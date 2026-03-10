@@ -19,7 +19,7 @@ sudo apt-get install -y podman
 
 
 ```bash
-cd SRC_DIR podman build -t binance-data-collector:ubuntu24 .
+cd SRC_DIR && podman build -t binance-data-collector:ubuntu24 .
 ```
 
 This image already runs Conan dependency installation and project build during `podman build`.

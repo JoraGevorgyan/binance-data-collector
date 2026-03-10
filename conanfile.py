@@ -24,4 +24,5 @@ class BinanceDataCollectorConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         cmake.configure()
-        cmake.build(target="<target_name>")
+        cmake.build()
+
