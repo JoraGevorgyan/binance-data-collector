@@ -23,6 +23,9 @@ namespace ssl = boost::asio::ssl;
 
 namespace {
 
+uint16_t g_i_store{0};     // value inited after pop from stack
+uint16_t g_i_aggregate{0}; // value inited after pop from queue
+
 std::string makeStreamPath(const std::vector<std::string>& streams) noexcept {
 	std::string path = "/stream?streams=";
 	for (const auto& stream : streams) {
@@ -49,13 +52,41 @@ bool isExpectedShutdownError(const beast::error_code& ec) noexcept {
 	       ec == ssl::error::stream_truncated;
 }
 
+template <typename b_lockfree_stack_t>
+void putIndicesToStack(b_lockfree_stack_t& dest_stack, uint16_t num_indices) {
+	for (auto i = num_indices - 1; i >= 0; --i) {
+		if (!dest_stack.push(i)) {
+			return; // this should never happen, but it's safe this way
+		}
+	}
+}
+
+template <typename b_lockfree_queue_t>
+void waitForQueueDrain(b_lockfree_queue_t& target_queue,
+                       Canceler::Canceler& canceler,
+                       const std::chrono::milliseconds timeout) noexcept {
+	const auto deadline = std::chrono::steady_clock::now() + timeout;
+	while (!canceler.isCanceled() &&
+	       std::chrono::steady_clock::now() < deadline) {
+		if (target_queue.empty()) {
+			return;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+}
+
 } // namespace
 
 WebSocketClient::WebSocketClient(const Config::Config& config,
                                  Canceler::Canceler& canceler)
-    : m_config(config), m_canceler(canceler) {}
+    : m_config(config),
+      m_canceler(canceler),
+      m_receiver_stopped{true},
+      m_msg_list_arr(m_perfect_size) {}
 
 bool WebSocketClient::runWebSocketSession() noexcept {
+	putIndicesToStack(m_free_indices, m_msg_list_arr.size());
+
 	spdlog::info("Starting WebSocket session");
 	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
 	DataCollector::Aggregator aggregator(m_canceler, m_config.getStatsLogger(),
@@ -147,7 +178,8 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 
 		receiveAndStore(ws_stream);
 		m_receiver_stopped.store(true, std::memory_order_release);
-		waitForQueueDrain(std::chrono::milliseconds(1500));
+		waitForQueueDrain(m_to_process_indices, m_canceler,
+		                  std::chrono::milliseconds(1500));
 
 		spdlog::info("Closing WebSocket connection to {}{}", host, target);
 		if (!ws_stream.is_open()) {
@@ -176,6 +208,10 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 
 void WebSocketClient::receiveAndStore(
     websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream) {
+	if (!m_free_indices.pop(g_i_store)) {
+		spdlog::critical("No free index available to store incoming message");
+		return; // shouldn't happen actually
+	}
 	const auto reconnection_delay = m_config.getReconnectionDelay();
 	const auto timer = std::chrono::steady_clock::now();
 	while (!m_canceler.isCanceled()) {
@@ -198,33 +234,18 @@ void WebSocketClient::receiveAndStore(
 			spdlog::error("WebSocket read error: {}", ec.message());
 			return;
 		}
-		const auto message = beast::buffers_to_string(buffer.data());
-		const std::string* msg_ptr = new (std::nothrow) std::string(message);
-		if (msg_ptr == nullptr) {
-			spdlog::error("Failed to allocate memory for message copy");
-			return;
-		}
+		auto message = beast::buffers_to_string(buffer.data());
 		spdlog::debug("Received message: {}", message);
-		 /// while can't push, wait a little and trye again????
-		if (!m_blk_queue_str_items.bounded_push(msg_ptr)) {
-			delete msg_ptr; // shouldn't happen in practice
-			spdlog::critical("loss of data, queue is full...");
-			return;
-		}
-	}
-}
+		auto& msg_list = m_msg_list_arr[g_i_store];
+		msg_list.emplace_back(std::move(message));
 
-void WebSocketClient::waitForQueueDrain(
-    const std::chrono::milliseconds timeout) noexcept {
-	const auto deadline = std::chrono::steady_clock::now() + timeout;
-	while (std::chrono::steady_clock::now() < deadline) {
-		if (m_blk_queue_str_items.empty()) {
-			return;
+		bool is_limit_low = false;
+		if (msg_list.size() > m_cur_list_limit) {
+			is_limit_low = m_to_process_indices.bounded_push(g_i_store);
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(25));
-	}
-	if (!m_blk_queue_str_items.empty()) {
-		spdlog::warn("Queue not fully drained before close");
+		if (is_limit_low) {
+			m_cur_list_limit = m_cur_list_limit * 2 + 1;
+		}
 	}
 }
 
@@ -232,12 +253,9 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 	spdlog::debug("Aggregator worker thread started");
 
 	while (true) {
-		const std::string* cur_message_ptr = nullptr;
-		if (!m_blk_queue_str_items.pop(cur_message_ptr) ||
-		    cur_message_ptr == nullptr) {
+		if (!m_to_process_indices.pop(g_i_aggregate)) {
 			if (m_canceler.isCanceled() &&
-			    m_receiver_stopped.load(std::memory_order_acquire) &&
-			    m_blk_queue_str_items.empty()) {
+			    m_receiver_stopped.load(std::memory_order_acquire)) {
 				spdlog::debug("Aggregator worker thread break");
 				break;
 			}
@@ -245,27 +263,21 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
-		const auto trade_event_opt =
-		    Aggregator::parseTradeEvent(*cur_message_ptr);
 
-		if (trade_event_opt.has_value()) {
-			spdlog::debug("update stats");
-			aggregator.update(trade_event_opt.value());
-		} else {
-			spdlog::warn("Failed to parse message: {}", *cur_message_ptr);
+		for (auto& msg : m_msg_list_arr[g_i_aggregate]) {
+			const auto trade_event_opt = Aggregator::parseTradeEvent(msg);
+
+			if (trade_event_opt.has_value()) {
+				spdlog::debug("update stats");
+				aggregator.update(trade_event_opt.value());
+			} else {
+				spdlog::warn("Failed to parse message: {}", msg);
+			}
 		}
-		delete cur_message_ptr;
+		m_msg_list_arr[g_i_aggregate].clear();
+		m_free_indices.bounded_push(g_i_aggregate);
 	}
 	spdlog::debug("Aggregator worker thread exiting after queue drain");
-}
-
-void WebSocketClient::clearQueue() noexcept {
-	spdlog::debug("Clearing message queue");
-	const std::string* cur_message_ptr = nullptr;
-	while (m_blk_queue_str_items.pop(cur_message_ptr)) {
-		delete cur_message_ptr;
-		cur_message_ptr = nullptr;
-	}
 }
 
 } // namespace DataCollector
