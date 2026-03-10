@@ -43,6 +43,12 @@ std::size_t validateWorkersNum(std::size_t num) noexcept {
 	return num - busy_workers;
 }
 
+bool isExpectedShutdownError(const beast::error_code& ec) noexcept {
+	return ec == websocket::error::closed ||
+	       ec == net::error::operation_aborted || ec == net::error::eof ||
+	       ec == ssl::error::stream_truncated;
+}
+
 } // namespace
 
 WebSocketClient::WebSocketClient(const Config::Config& config,
@@ -50,9 +56,8 @@ WebSocketClient::WebSocketClient(const Config::Config& config,
     : m_config(config), m_canceler(canceler) {}
 
 bool WebSocketClient::runWebSocketSession() noexcept {
-	spdlog::info("Trying to create a session");
+	spdlog::info("Starting WebSocket session");
 	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
-
 	DataCollector::Aggregator aggregator(m_canceler, m_config.getStatsLogger(),
 	                                     m_config.getStatsFlushPeriod());
 
@@ -65,7 +70,8 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 		aggregator_threads.emplace_back(
 		    [&aggregator, this]() { aggregateData(aggregator); });
 	}
-	spdlog::debug("join other threads");
+
+	spdlog::debug("join other threads to exit");
 	client_session_thread.join();
 	for (auto& aggregator_thread : aggregator_threads) {
 		aggregator_thread.join();
@@ -97,6 +103,7 @@ void WebSocketClient::runClientSession() noexcept {
 void WebSocketClient::runClientSessionImpl(const std::string& host,
                                            const std::string& port,
                                            const std::string& target) noexcept {
+	m_receiver_stopped.store(false, std::memory_order_release);
 	try {
 		net::io_context ioc;
 		ssl::context ctx{ssl::context::tls_client};
@@ -110,6 +117,7 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 		auto native = ssl_stream.native_handle();
 		if (native == nullptr) {
 			spdlog::error("Missing native SSL handle for {}", host);
+			m_receiver_stopped.store(true, std::memory_order_release);
 			return;
 		}
 
@@ -117,6 +125,7 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 			const beast::error_code ec{static_cast<int>(::ERR_get_error()),
 			                           net::error::get_ssl_category()};
 			spdlog::error("SNI setup failed {}: {}", host, ec.message());
+			m_receiver_stopped.store(true, std::memory_order_release);
 			return;
 		}
 
@@ -137,14 +146,30 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 		spdlog::info("Connected to {}{}", host, target);
 
 		receiveAndStore(ws_stream);
+		m_receiver_stopped.store(true, std::memory_order_release);
+		waitForQueueDrain(std::chrono::milliseconds(1500));
+
 		spdlog::info("Closing WebSocket connection to {}{}", host, target);
+		if (!ws_stream.is_open()) {
+			spdlog::debug("WebSocket already closed for {}{}", host, target);
+			return;
+		}
 		beast::error_code ec_close;
 		ws_stream.close(websocket::close_code::normal, ec_close);
-		if (ec_close) {
-			spdlog::error("Error closing WebSocket connection: {}",
-			              ec_close.message());
+		if (!ec_close) {
+			spdlog::info("WebSocket connection closed for {}{}", host, target);
+			return;
 		}
+		if (isExpectedShutdownError(ec_close)) {
+			spdlog::info(
+			    "WebSocket close completed with expected shutdown state: {}",
+			    ec_close.message());
+			return;
+		}
+		spdlog::error("WebSocket close failed ({}): {}", ec_close.value(),
+		              ec_close.message());
 	} catch (const std::exception& ex) {
+		m_receiver_stopped.store(true, std::memory_order_release);
 		spdlog::error("Connection loop exception: {}", ex.what());
 	}
 }
@@ -164,6 +189,12 @@ void WebSocketClient::receiveAndStore(
 		beast::error_code ec;
 		ws_stream.read(buffer, ec);
 		if (ec) {
+			if (isExpectedShutdownError(ec)) {
+				spdlog::info(
+				    "WebSocket read ended due to expected shutdown: {}",
+				    ec.message());
+				return;
+			}
 			spdlog::error("WebSocket read error: {}", ec.message());
 			return;
 		}
@@ -182,14 +213,33 @@ void WebSocketClient::receiveAndStore(
 	}
 }
 
+void WebSocketClient::waitForQueueDrain(
+    const std::chrono::milliseconds timeout) noexcept {
+	const auto deadline = std::chrono::steady_clock::now() + timeout;
+	while (std::chrono::steady_clock::now() < deadline) {
+		if (m_blk_queue_str_items.empty()) {
+			return;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(25));
+	}
+	if (!m_blk_queue_str_items.empty()) {
+		spdlog::warn("Queue not fully drained before close");
+	}
+}
+
 void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 	spdlog::debug("Aggregator worker thread started");
 
-	while (!m_canceler.isCanceled()) {
-		spdlog::debug("Aggregator worker thread in loop");
+	while (true) {
 		const std::string* cur_message_ptr = nullptr;
 		if (!m_blk_queue_str_items.pop(cur_message_ptr) ||
 		    cur_message_ptr == nullptr) {
+			if (m_canceler.isCanceled() &&
+			    m_receiver_stopped.load(std::memory_order_acquire) &&
+			    m_blk_queue_str_items.empty()) {
+				spdlog::debug("Aggregator worker thread break");
+				break;
+			}
 			spdlog::debug("No message to process, sleeping...");
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
@@ -205,6 +255,7 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 		}
 		delete cur_message_ptr;
 	}
+	spdlog::debug("Aggregator worker thread exiting after queue drain");
 }
 
 void WebSocketClient::clearQueue() noexcept {

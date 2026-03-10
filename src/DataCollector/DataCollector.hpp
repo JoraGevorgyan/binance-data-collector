@@ -15,6 +15,7 @@
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/lockfree/queue.hpp>
 
+#include <atomic>
 #include <string>
 
 namespace DataCollector {
@@ -36,6 +37,7 @@ public:
 private:
 	const Config::Config& m_config;
 	Canceler::Canceler& m_canceler;
+	std::atomic<bool> m_receiver_stopped{true};
 	boost::lockfree::queue<const std::string*, boost::lockfree::capacity<16384>>
 	    m_blk_queue_str_items;
 
@@ -46,6 +48,7 @@ private:
 	                          const std::string& target) noexcept;
 	void receiveAndStore(
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
+	void waitForQueueDrain(std::chrono::milliseconds timeout) noexcept;
 	void aggregateData(Aggregator& aggregator) noexcept;
 	void clearQueue() noexcept;
 };
