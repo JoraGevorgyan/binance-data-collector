@@ -401,8 +401,11 @@ void Config::printHelp() const noexcept {
 	m_po_desc.print(std::cout);
 }
 
-bool Config::isDebugMode() const noexcept {
-	return m_po_var_map[Key::debug].as<bool>();
+bool Config::isDebugMode() const {
+	if (m_po_var_map.count(Key::debug) > 0) {
+		return m_po_var_map[Key::debug].as<bool>();
+	}
+	return false;
 }
 
 std::string_view Config::getServiceName() const noexcept {

@@ -21,7 +21,7 @@ public:
 	bool initLogger() noexcept;
 
 	bool isHelp() const noexcept;
-	bool isDebugMode() const noexcept;
+	bool isDebugMode() const;
 
 	void printHelp() const noexcept;
 	std::string_view getServiceName() const noexcept;

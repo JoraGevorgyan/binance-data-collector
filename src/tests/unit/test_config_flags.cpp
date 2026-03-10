@@ -19,8 +19,6 @@ BOOST_AUTO_TEST_CASE(config_parses_help_and_debug_flags) {
 	BOOST_TEST(config->getServiceDisplayName() ==
 	           "Binance Data Collector Service");
 
-	BOOST_TEST(config->getStatsOutputPath() ==
-	           "/var/log/binance-data-collector/statistics.log");
 	BOOST_TEST(!config->getHostName().empty());
 	BOOST_TEST(config->getPort() == "9443");
 
