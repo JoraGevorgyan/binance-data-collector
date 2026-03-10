@@ -205,8 +205,9 @@ void WebSocketClient::receiveAndStore(
 			return;
 		}
 		spdlog::debug("Received message: {}", message);
+		 /// while can't push, wait a little and trye again????
 		if (!m_blk_queue_str_items.bounded_push(msg_ptr)) {
-			delete msg_ptr;
+			delete msg_ptr; // shouldn't happen in practice
 			spdlog::critical("loss of data, queue is full...");
 			return;
 		}
