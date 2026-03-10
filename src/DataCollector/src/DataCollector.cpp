@@ -72,6 +72,20 @@ void waitForQueueDrain(b_lockfree_queue_t& target_queue,
 	}
 }
 
+template <typename b_lockfree_queue_t>
+void waitAndPush(b_lockfree_queue_t& target_queue,
+                 Canceler::Canceler& canceler,
+                 const std::chrono::milliseconds timeout) noexcept {
+	const auto deadline = std::chrono::steady_clock::now() + timeout;
+	while (!canceler.isCanceled() &&
+	       std::chrono::steady_clock::now() < deadline) {
+		if (target_queue.empty()) {
+			return;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+}
+
 } // namespace
 
 WebSocketClient::WebSocketClient(const Config::Config& config,
@@ -203,10 +217,45 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 	}
 }
 
+bool WebSocketClient::putMsgToProcess(
+    std::string& msg,
+    std::optional<uint16_t>& put_index) noexcept {
+	if (!(put_index.has_value() || m_free_indices.pop(put_index.value()))) {
+		spdlog::critical("No free slot available in queue(impossible)");
+		return false;
+	}
+
+	auto& msg_list = m_msg_list_arr[put_index.value()];
+	msg_list.emplace_back(std::move(msg));
+	if (msg_list.size() < m_cur_list_limit) {
+		return true;
+	}
+	spdlog::debug("Pushing index {} to process queue", put_index.value());
+	bool is_pushed = false;
+	const auto deadline =
+	    std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+	while (!m_canceler.isCanceled() &&
+	       std::chrono::steady_clock::now() < deadline) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		spdlog::debug("Sleeping to be able to push");
+		if (m_to_process_indices.push(put_index.value())) {
+			is_pushed = true;
+			break;
+		}
+	}
+	if (is_pushed) {
+		spdlog::debug("pushed a list to be proceed");
+		m_cur_list_limit += 100; // think about how to manage this better
+		put_index.reset();
+	}
+	return true;
+}
+
 void WebSocketClient::receiveAndStore(
     websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream) {
 	const auto reconnection_delay = m_config.getReconnectionDelay();
 	const auto timer = std::chrono::steady_clock::now();
+	std::optional<uint16_t> put_index = std::nullopt;
 	while (!m_canceler.isCanceled()) {
 		if (std::chrono::steady_clock::now() - timer >= reconnection_delay) {
 			spdlog::warn("Reconnection delay of {} minutes exceeded.",
@@ -219,9 +268,7 @@ void WebSocketClient::receiveAndStore(
 		ws_stream.read(buffer, ec);
 		if (ec) {
 			if (isExpectedShutdownError(ec)) {
-				spdlog::info(
-				    "WebSocket read ended due to expected shutdown: {}",
-				    ec.message());
+				spdlog::info("WebSocket:expected shutdown: {}", ec.message());
 				return;
 			}
 			spdlog::error("WebSocket read error: {}", ec.message());
@@ -229,21 +276,8 @@ void WebSocketClient::receiveAndStore(
 		}
 		auto message = beast::buffers_to_string(buffer.data());
 		spdlog::debug("Received message: {}", message);
-		uint16_t i_store;
-		if (!m_free_indices.pop(i_store)) {
-			spdlog::critical(
-			    "No free index available to store incoming message");
-			return; // shouldn't happen actually
-		}
-		auto& msg_list = m_msg_list_arr[i_store];
-		msg_list.emplace_back(std::move(message));
-
-		bool is_limit_low = false;
-		if (msg_list.size() > m_cur_list_limit) {
-			is_limit_low = m_to_process_indices.bounded_push(i_store);
-		}
-		if (is_limit_low) {
-			m_cur_list_limit = m_cur_list_limit * 2 + 1;
+		if (!putMsgToProcess(message, put_index)) {
+			return;
 		}
 	}
 }
