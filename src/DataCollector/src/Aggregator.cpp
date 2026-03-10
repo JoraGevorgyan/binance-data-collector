@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <limits>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "../../../thirdparty/nlohmann/json.hpp"
 #include "spdlog/spdlog.h"
@@ -63,18 +64,30 @@ std::optional<TradeEvent> Aggregator::parseTradeEvent(
 }
 
 void Aggregator::update(const TradeEvent& event_msg) noexcept {
-	const std::lock_guard<std::mutex> lock(m_mutex);
-
-	TradeStatistics& stats = m_statistics[event_msg.symbol];
-	stats.trades += 1;
-	stats.volume += event_msg.price * event_msg.quantity;
-	stats.min_price = std::min(stats.min_price, event_msg.price);
-	stats.max_price = std::max(stats.max_price, event_msg.price);
+	TradeStatistics initial_stats{};
+	initial_stats.trades = 1;
+	initial_stats.volume = event_msg.price * event_msg.quantity;
+	initial_stats.min_price = event_msg.price;
+	initial_stats.max_price = event_msg.price;
 	if (event_msg.is_buyer_or_maker) {
-		stats.sell_count += 1;
+		initial_stats.sell_count = 1;
 	} else {
-		stats.buy_count += 1;
+		initial_stats.buy_count = 1;
 	}
+
+	m_statistics.insert_or_visit(
+	    {event_msg.symbol, initial_stats}, [&](auto& entry) {
+		    TradeStatistics& stats = entry.second;
+		    stats.trades += 1;
+		    stats.volume += event_msg.price * event_msg.quantity;
+		    stats.min_price = std::min(stats.min_price, event_msg.price);
+		    stats.max_price = std::max(stats.max_price, event_msg.price);
+		    if (event_msg.is_buyer_or_maker) {
+			    stats.sell_count += 1;
+		    } else {
+			    stats.buy_count += 1;
+		    }
+	    });
 }
 
 bool Aggregator::writeSnapshotSync() noexcept {
@@ -83,13 +96,10 @@ bool Aggregator::writeSnapshotSync() noexcept {
 		return false;
 	}
 	std::unordered_map<std::string, TradeStatistics> cur_stats;
-	{
-		const std::lock_guard<std::mutex> lock(m_mutex);
-		cur_stats = m_statistics;
-		for (auto& entry : m_statistics) {
-			entry.second.reset();
-		}
-	}
+	m_statistics.visit_all([&](auto& entry) {
+		cur_stats[entry.first] = entry.second;
+		entry.second.reset();
+	});
 
 	const auto timestamp = formatTimestamp(std::chrono::system_clock::now());
 	m_out->info("timestamp={}", timestamp);
