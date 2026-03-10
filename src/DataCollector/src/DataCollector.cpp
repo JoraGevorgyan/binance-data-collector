@@ -43,16 +43,63 @@ std::size_t validateWorkersNum(std::size_t num) noexcept {
 	return num - busy_workers;
 }
 
+bool isExpectedShutdownError(const beast::error_code& ec) noexcept {
+	return ec == websocket::error::closed ||
+	       ec == net::error::operation_aborted || ec == net::error::eof ||
+	       ec == ssl::error::stream_truncated;
+}
+
+template <typename b_lockfree_stack_t>
+void putIndicesToStack(b_lockfree_stack_t& dest_stack, uint16_t num_indices) {
+	for (auto i = num_indices - 1; i >= 0; --i) {
+		if (!dest_stack.push(i)) {
+			return; // this should never happen, but it's safe this way
+		}
+	}
+}
+
+template <typename b_lockfree_queue_t>
+void waitForQueueDrain(b_lockfree_queue_t& target_queue,
+                       Canceler::Canceler& canceler,
+                       const std::chrono::milliseconds timeout) noexcept {
+	const auto deadline = std::chrono::steady_clock::now() + timeout;
+	while (!canceler.isCanceled() &&
+	       std::chrono::steady_clock::now() < deadline) {
+		if (target_queue.empty()) {
+			return;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+}
+
+template <typename b_lockfree_queue_t>
+void waitAndPush(b_lockfree_queue_t& target_queue,
+                 Canceler::Canceler& canceler,
+                 const std::chrono::milliseconds timeout) noexcept {
+	const auto deadline = std::chrono::steady_clock::now() + timeout;
+	while (!canceler.isCanceled() &&
+	       std::chrono::steady_clock::now() < deadline) {
+		if (target_queue.empty()) {
+			return;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+}
+
 } // namespace
 
 WebSocketClient::WebSocketClient(const Config::Config& config,
                                  Canceler::Canceler& canceler)
-    : m_config(config), m_canceler(canceler) {}
+    : m_config(config),
+      m_canceler(canceler),
+      m_receiver_stopped{true},
+      m_msg_list_arr(m_perfect_size) {}
 
 bool WebSocketClient::runWebSocketSession() noexcept {
-	spdlog::info("Trying to create a session");
-	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
+	putIndicesToStack(m_free_indices, m_msg_list_arr.size());
 
+	spdlog::info("Starting WebSocket session");
+	std::thread client_session_thread(&WebSocketClient::runClientSession, this);
 	DataCollector::Aggregator aggregator(m_canceler, m_config.getStatsLogger(),
 	                                     m_config.getStatsFlushPeriod());
 
@@ -65,7 +112,8 @@ bool WebSocketClient::runWebSocketSession() noexcept {
 		aggregator_threads.emplace_back(
 		    [&aggregator, this]() { aggregateData(aggregator); });
 	}
-	spdlog::debug("join other threads");
+
+	spdlog::debug("join other threads to exit");
 	client_session_thread.join();
 	for (auto& aggregator_thread : aggregator_threads) {
 		aggregator_thread.join();
@@ -97,6 +145,7 @@ void WebSocketClient::runClientSession() noexcept {
 void WebSocketClient::runClientSessionImpl(const std::string& host,
                                            const std::string& port,
                                            const std::string& target) noexcept {
+	m_receiver_stopped.store(false, std::memory_order_release);
 	try {
 		net::io_context ioc;
 		ssl::context ctx{ssl::context::tls_client};
@@ -110,6 +159,7 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 		auto native = ssl_stream.native_handle();
 		if (native == nullptr) {
 			spdlog::error("Missing native SSL handle for {}", host);
+			m_receiver_stopped.store(true, std::memory_order_release);
 			return;
 		}
 
@@ -117,6 +167,7 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 			const beast::error_code ec{static_cast<int>(::ERR_get_error()),
 			                           net::error::get_ssl_category()};
 			spdlog::error("SNI setup failed {}: {}", host, ec.message());
+			m_receiver_stopped.store(true, std::memory_order_release);
 			return;
 		}
 
@@ -137,22 +188,74 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 		spdlog::info("Connected to {}{}", host, target);
 
 		receiveAndStore(ws_stream);
+		m_receiver_stopped.store(true, std::memory_order_release);
+		waitForQueueDrain(m_to_process_indices, m_canceler,
+		                  std::chrono::milliseconds(1500));
+
 		spdlog::info("Closing WebSocket connection to {}{}", host, target);
+		if (!ws_stream.is_open()) {
+			spdlog::debug("WebSocket already closed for {}{}", host, target);
+			return;
+		}
 		beast::error_code ec_close;
 		ws_stream.close(websocket::close_code::normal, ec_close);
-		if (ec_close) {
-			spdlog::error("Error closing WebSocket connection: {}",
-			              ec_close.message());
+		if (!ec_close) {
+			spdlog::info("WebSocket connection closed for {}{}", host, target);
+			return;
 		}
+		if (isExpectedShutdownError(ec_close)) {
+			spdlog::info(
+			    "WebSocket close completed with expected shutdown state: {}",
+			    ec_close.message());
+			return;
+		}
+		spdlog::error("WebSocket close failed ({}): {}", ec_close.value(),
+		              ec_close.message());
 	} catch (const std::exception& ex) {
+		m_receiver_stopped.store(true, std::memory_order_release);
 		spdlog::error("Connection loop exception: {}", ex.what());
 	}
+}
+
+bool WebSocketClient::putMsgToProcess(
+    std::string& msg,
+    std::optional<uint16_t>& put_index) noexcept {
+	if (!(put_index.has_value() || m_free_indices.pop(put_index.value()))) {
+		spdlog::critical("No free slot available in queue(impossible)");
+		return false;
+	}
+
+	auto& msg_list = m_msg_list_arr[put_index.value()];
+	msg_list.emplace_back(std::move(msg));
+	if (msg_list.size() < m_cur_list_limit) {
+		return true;
+	}
+	spdlog::debug("Pushing index {} to process queue", put_index.value());
+	bool is_pushed = false;
+	const auto deadline =
+	    std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+	while (!m_canceler.isCanceled() &&
+	       std::chrono::steady_clock::now() < deadline) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		spdlog::debug("Sleeping to be able to push");
+		if (m_to_process_indices.push(put_index.value())) {
+			is_pushed = true;
+			break;
+		}
+	}
+	if (is_pushed) {
+		spdlog::debug("pushed a list to be proceed");
+		m_cur_list_limit += 100; // think about how to manage this better
+		put_index.reset();
+	}
+	return true;
 }
 
 void WebSocketClient::receiveAndStore(
     websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream) {
 	const auto reconnection_delay = m_config.getReconnectionDelay();
 	const auto timer = std::chrono::steady_clock::now();
+	std::optional<uint16_t> put_index = std::nullopt;
 	while (!m_canceler.isCanceled()) {
 		if (std::chrono::steady_clock::now() - timer >= reconnection_delay) {
 			spdlog::warn("Reconnection delay of {} minutes exceeded.",
@@ -164,19 +267,16 @@ void WebSocketClient::receiveAndStore(
 		beast::error_code ec;
 		ws_stream.read(buffer, ec);
 		if (ec) {
+			if (isExpectedShutdownError(ec)) {
+				spdlog::info("WebSocket:expected shutdown: {}", ec.message());
+				return;
+			}
 			spdlog::error("WebSocket read error: {}", ec.message());
 			return;
 		}
-		const auto message = beast::buffers_to_string(buffer.data());
-		const std::string* msg_ptr = new (std::nothrow) std::string(message);
-		if (msg_ptr == nullptr) {
-			spdlog::error("Failed to allocate memory for message copy");
-			return;
-		}
+		auto message = beast::buffers_to_string(buffer.data());
 		spdlog::debug("Received message: {}", message);
-		if (!m_blk_queue_str_items.bounded_push(msg_ptr)) {
-			delete msg_ptr;
-			spdlog::critical("loss of data, queue is full...");
+		if (!putMsgToProcess(message, put_index)) {
 			return;
 		}
 	}
@@ -185,35 +285,33 @@ void WebSocketClient::receiveAndStore(
 void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 	spdlog::debug("Aggregator worker thread started");
 
-	while (!m_canceler.isCanceled()) {
-		spdlog::debug("Aggregator worker thread in loop");
-		const std::string* cur_message_ptr = nullptr;
-		if (!m_blk_queue_str_items.pop(cur_message_ptr) ||
-		    cur_message_ptr == nullptr) {
+	while (true) {
+		uint16_t i_aggregate;
+		if (!m_to_process_indices.pop(i_aggregate)) {
+			if (m_canceler.isCanceled() &&
+			    m_receiver_stopped.load(std::memory_order_acquire)) {
+				spdlog::debug("Aggregator worker thread break");
+				break;
+			}
 			spdlog::debug("No message to process, sleeping...");
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
-		const auto trade_event_opt =
-		    Aggregator::parseTradeEvent(*cur_message_ptr);
 
-		if (trade_event_opt.has_value()) {
-			spdlog::debug("update stats");
-			aggregator.update(trade_event_opt.value());
-		} else {
-			spdlog::warn("Failed to parse message: {}", *cur_message_ptr);
+		for (auto& msg : m_msg_list_arr[i_aggregate]) {
+			const auto trade_event_opt = Aggregator::parseTradeEvent(msg);
+
+			if (trade_event_opt.has_value()) {
+				spdlog::debug("update stats");
+				aggregator.update(trade_event_opt.value());
+			} else {
+				spdlog::warn("Failed to parse message: {}", msg);
+			}
 		}
-		delete cur_message_ptr;
+		m_msg_list_arr[i_aggregate].clear();
+		m_free_indices.bounded_push(i_aggregate);
 	}
-}
-
-void WebSocketClient::clearQueue() noexcept {
-	spdlog::debug("Clearing message queue");
-	const std::string* cur_message_ptr = nullptr;
-	while (m_blk_queue_str_items.pop(cur_message_ptr)) {
-		delete cur_message_ptr;
-		cur_message_ptr = nullptr;
-	}
+	spdlog::debug("Aggregator worker thread exiting after queue drain");
 }
 
 } // namespace DataCollector

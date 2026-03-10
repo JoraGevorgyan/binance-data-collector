@@ -14,8 +14,11 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/lockfree/queue.hpp>
+#include <boost/lockfree/stack.hpp>
 
+#include <atomic>
 #include <string>
+#include <vector>
 
 namespace DataCollector {
 
@@ -29,15 +32,15 @@ public:
 	                         Canceler::Canceler& canceler);
 	WebSocketClient(const WebSocketClient&) = delete;
 	WebSocketClient& operator=(const WebSocketClient&) = delete;
-	~WebSocketClient() { clearQueue(); }
+	~WebSocketClient() = default;
 
 	bool runWebSocketSession() noexcept;
 
 private:
 	const Config::Config& m_config;
 	Canceler::Canceler& m_canceler;
-	boost::lockfree::queue<const std::string*, boost::lockfree::capacity<16384>>
-	    m_blk_queue_str_items;
+	std::atomic<bool> m_receiver_stopped;
+	std::vector<std::vector<std::string>> m_msg_list_arr;
 
 private:
 	void runClientSession() noexcept;
@@ -47,7 +50,15 @@ private:
 	void receiveAndStore(
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
 	void aggregateData(Aggregator& aggregator) noexcept;
-	void clearQueue() noexcept;
+	bool putMsgToProcess(std::string& msg,
+	                     std::optional<uint16_t>& put_index) noexcept;
+
+	static constexpr uint16_t m_perfect_size = 1024;
+	boost::lockfree::queue<uint16_t, boost::lockfree::capacity<m_perfect_size>>
+	    m_to_process_indices;
+	boost::lockfree::stack<uint16_t, boost::lockfree::capacity<m_perfect_size>>
+	    m_free_indices;
+	uint16_t m_cur_list_limit{200}; // don't let the aggregator wait more
 };
 
 } // namespace DataCollector
