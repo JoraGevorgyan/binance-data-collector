@@ -8,6 +8,7 @@ include(src/build-options.cmake)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/conan_provider.cmake
 	${CMAKE_CURRENT_SOURCE_DIR}/cmake/code_coverage.cmake
 )
 
