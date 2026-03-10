@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStartPre=/usr/bin/install -d -m 0755 /var/log/binance-data-collector
-ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/@EXECUTABLE_NAME@ --config @SERVICE_CONFIG_DIR@/config.yaml --log-path /var/log/binance-data-collector/cur.log
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/@EXECUTABLE_NAME@ --config @SERVICE_CONFIG_DIR@/config.json --log-path /var/log/binance-data-collector/cur.log
 Restart=on-failure
 RestartSec=5s
 
