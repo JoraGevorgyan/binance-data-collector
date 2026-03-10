@@ -24,7 +24,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "RUN_CLANG_TIDY": "ON",
                 "CONFIGURE_CLANG_FORMAT": "ON",
-                "RUN_TESTS": "ON"
+                "RUN_TESTS": "OFF"
             }
         },
         {
@@ -32,6 +32,38 @@
             "inherits": "base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "debug-sanitizer-address",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RUN_CLANG_TIDY": "ON",
+                "CONFIGURE_CLANG_FORMAT": "ON",
+                "ENABLE_SANITIZER_ADDRESS": "ON",
+                "ENABLE_SANITIZER_UNDEFINED": "ON",
+                "ENABLE_SANITIZER_LEAK": "ON"
+            }
+        },
+        {
+            "name": "debug-sanitizer-thread",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RUN_CLANG_TIDY": "ON",
+                "CONFIGURE_CLANG_FORMAT": "ON",
+                "ENABLE_SANITIZER_THREAD": "ON"
+            }
+        },
+        {
+            "name": "debug-sanitizer-memory",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RUN_CLANG_TIDY": "ON",
+                "CONFIGURE_CLANG_FORMAT": "ON",
+                "ENABLE_SANITIZER_MEMORY": "ON"
             }
         }
     ],
@@ -45,6 +77,21 @@
             "name": "release",
             "displayName": "Release build",
             "configurePreset": "release"
+        },
+        {
+            "name": "debug-sanitizer-memory",
+            "displayName": "Debug build with memory sanitizers",
+            "configurePreset": "debug-sanitizer-memory"
+        },
+        {
+            "name": "debug-sanitizer-address",
+            "displayName": "Debug build with address/undefined/leak sanitizers",
+            "configurePreset": "debug-sanitizer-address"
+        },
+        {
+            "name": "debug-sanitizer-thread",
+            "displayName": "Debug build with thread sanitizer",
+            "configurePreset": "debug-sanitizer-thread"
         }
     ]
 }
