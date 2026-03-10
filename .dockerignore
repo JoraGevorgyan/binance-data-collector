@@ -1,0 +1,33 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# Conan local cache/output
+conan.lock
+conanbuild*
+conanrun*
+generators/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+compile_commands.json
+
+# VCS and IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS/editor temp files
+*.swp
+*.swo
+*~
+.DS_Store
