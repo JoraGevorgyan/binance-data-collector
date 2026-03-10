@@ -51,7 +51,7 @@ private:
 	    websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream);
 	void aggregateData(Aggregator& aggregator) noexcept;
 
-	static constexpr u_int16_t m_perfect_size = 1024;
+	static constexpr uint16_t m_perfect_size = 1024;
 	boost::lockfree::queue<uint16_t, boost::lockfree::capacity<m_perfect_size>>
 	    m_to_process_indices;
 	boost::lockfree::stack<uint16_t, boost::lockfree::capacity<m_perfect_size>>

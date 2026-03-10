@@ -23,9 +23,6 @@ namespace ssl = boost::asio::ssl;
 
 namespace {
 
-uint16_t g_i_store{0};     // value inited after pop from stack
-uint16_t g_i_aggregate{0}; // value inited after pop from queue
-
 std::string makeStreamPath(const std::vector<std::string>& streams) noexcept {
 	std::string path = "/stream?streams=";
 	for (const auto& stream : streams) {
@@ -208,10 +205,6 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 
 void WebSocketClient::receiveAndStore(
     websocket::stream<beast::ssl_stream<beast::tcp_stream>>& ws_stream) {
-	if (!m_free_indices.pop(g_i_store)) {
-		spdlog::critical("No free index available to store incoming message");
-		return; // shouldn't happen actually
-	}
 	const auto reconnection_delay = m_config.getReconnectionDelay();
 	const auto timer = std::chrono::steady_clock::now();
 	while (!m_canceler.isCanceled()) {
@@ -236,12 +229,18 @@ void WebSocketClient::receiveAndStore(
 		}
 		auto message = beast::buffers_to_string(buffer.data());
 		spdlog::debug("Received message: {}", message);
-		auto& msg_list = m_msg_list_arr[g_i_store];
+		uint16_t i_store;
+		if (!m_free_indices.pop(i_store)) {
+			spdlog::critical(
+			    "No free index available to store incoming message");
+			return; // shouldn't happen actually
+		}
+		auto& msg_list = m_msg_list_arr[i_store];
 		msg_list.emplace_back(std::move(message));
 
 		bool is_limit_low = false;
 		if (msg_list.size() > m_cur_list_limit) {
-			is_limit_low = m_to_process_indices.bounded_push(g_i_store);
+			is_limit_low = m_to_process_indices.bounded_push(i_store);
 		}
 		if (is_limit_low) {
 			m_cur_list_limit = m_cur_list_limit * 2 + 1;
@@ -253,7 +252,8 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 	spdlog::debug("Aggregator worker thread started");
 
 	while (true) {
-		if (!m_to_process_indices.pop(g_i_aggregate)) {
+		uint16_t i_aggregate;
+		if (!m_to_process_indices.pop(i_aggregate)) {
 			if (m_canceler.isCanceled() &&
 			    m_receiver_stopped.load(std::memory_order_acquire)) {
 				spdlog::debug("Aggregator worker thread break");
@@ -264,7 +264,7 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 			continue;
 		}
 
-		for (auto& msg : m_msg_list_arr[g_i_aggregate]) {
+		for (auto& msg : m_msg_list_arr[i_aggregate]) {
 			const auto trade_event_opt = Aggregator::parseTradeEvent(msg);
 
 			if (trade_event_opt.has_value()) {
@@ -274,8 +274,8 @@ void WebSocketClient::aggregateData(Aggregator& aggregator) noexcept {
 				spdlog::warn("Failed to parse message: {}", msg);
 			}
 		}
-		m_msg_list_arr[g_i_aggregate].clear();
-		m_free_indices.bounded_push(g_i_aggregate);
+		m_msg_list_arr[i_aggregate].clear();
+		m_free_indices.bounded_push(i_aggregate);
 	}
 	spdlog::debug("Aggregator worker thread exiting after queue drain");
 }
