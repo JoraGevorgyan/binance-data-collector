@@ -1,11 +1,11 @@
 #pragma once
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <chrono>
+#include <limits>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include "../common/Canceler.hpp"
 #include "spdlog/spdlog.h"
 
@@ -52,8 +52,7 @@ private:
 	Canceler::Canceler& m_canceler;
 	std::shared_ptr<spdlog::logger> m_out;
 	const std::chrono::seconds m_flush_period;
-	std::unordered_map<std::string, TradeStatistics> m_statistics;
-	std::mutex m_mutex;
+	boost::concurrent_flat_map<std::string, TradeStatistics> m_statistics;
 
 private:
 	bool writeSnapshotSync() noexcept;
