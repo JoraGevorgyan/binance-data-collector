@@ -1,10 +1,7 @@
 #include "../Aggregator.hpp"
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <limits>
-#include <sstream>
 #include <thread>
 #include <vector>
 #include "../../../thirdparty/nlohmann/json.hpp"
@@ -29,9 +26,7 @@ std::string formatTimestamp(
 Aggregator::Aggregator(Canceler::Canceler& canceler,
                        const std::weak_ptr<spdlog::logger>& out,
                        std::chrono::seconds flush_period)
-    : m_canceler(canceler),
-      m_out(out.lock()),
-      m_flush_period(flush_period) {}
+    : m_canceler(canceler), m_out(out.lock()), m_flush_period(flush_period) {}
 
 std::optional<TradeEvent> Aggregator::parseTradeEvent(
     const std::string& message) noexcept {

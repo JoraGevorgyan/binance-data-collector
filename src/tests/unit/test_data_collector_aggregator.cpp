@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <thread>
+#include "spdlog/sinks/basic_file_sink.h"
 
 BOOST_AUTO_TEST_CASE(aggregator_parse_trade_event_success) {
 	const std::string msg =
@@ -40,9 +41,13 @@ BOOST_AUTO_TEST_CASE(aggregator_flush_worker_writes_snapshot) {
 	     std::to_string(
 	         std::chrono::steady_clock::now().time_since_epoch().count()) +
 	     ".log");
+	const auto logger_name = tmp_path.filename().string();
+	auto stats_logger =
+	    spdlog::basic_logger_mt(logger_name, tmp_path.string(), true);
+	stats_logger->set_pattern("%v");
 
-	DataCollector::Aggregator aggregator(std::chrono::seconds(1),
-	                                     tmp_path.string(), canceler);
+	DataCollector::Aggregator aggregator(canceler, stats_logger,
+	                                     std::chrono::seconds(1));
 
 	DataCollector::TradeEvent first_event;
 	first_event.symbol = "BTCUSDT";
@@ -62,6 +67,7 @@ BOOST_AUTO_TEST_CASE(aggregator_flush_worker_writes_snapshot) {
 	std::this_thread::sleep_for(std::chrono::milliseconds(1200));
 	canceler.cancel();
 	worker.join();
+	stats_logger->flush();
 
 	std::ifstream in(tmp_path);
 	BOOST_REQUIRE(in.is_open());
@@ -73,5 +79,6 @@ BOOST_AUTO_TEST_CASE(aggregator_flush_worker_writes_snapshot) {
 	BOOST_TEST(snapshot.find("symbol=BTCUSDT trades=2") != std::string::npos);
 	BOOST_TEST(snapshot.find("buy=1 sell=1") != std::string::npos);
 
+	spdlog::drop(logger_name);
 	std::filesystem::remove(tmp_path);
 }
