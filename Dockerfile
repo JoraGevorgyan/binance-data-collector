@@ -14,12 +14,12 @@ RUN apt-get update \
         pkg-config \
         python3 \
         python3-venv \
+		pipx \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
-RUN pip3 install --no-cache-dir --upgrade pip3 \
-    && pip3 install --no-cache-dir conan
+ENV PATH="/root/.local/bin:/opt/venv/bin:${PATH}"
+RUN pipx install conan
 
 WORKDIR /workspace
 COPY . .

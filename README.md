@@ -3,6 +3,11 @@ Binance market data collection and aggregation service (WebSocket).
 
 
 _please check config.json(working template) and run --help after building, to know which arguments are supported_
+_also don't forget to update submodules before starting_
+
+```bash
+git submodule update --init --recursive
+```
 
 ## Run with Podman (Ubuntu host)
 
