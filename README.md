@@ -2,10 +2,37 @@
 Binance market data collection and aggregation service (WebSocket).
 
 
+_please check config.json(working template) and run --help after building, to know which arguments are supported_
+
+## Run with Podman (Ubuntu host)
+
+### Host packages required
+
+On Ubuntu/Debian hosts:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y podman
+```
+
+### Build image
+
+
+```bash
+cd SRC_DIR podman build -t binance-data-collector:ubuntu24 .
+```
+
+This image already runs Conan dependency installation and project build during `podman build`.
+
+### Run service in container
+
+Start an interactive shell in the container:
+
+```bash
+podman run -it --name bdc binance-data-collector:ubuntu24
+```
 
 ## local build/run
-
-_please check config.json(working template) and run --help after building, to know which arguments are supported_
 
 ### Install dependencies and build with Conan:
 
