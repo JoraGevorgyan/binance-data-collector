@@ -1,11 +1,12 @@
 from conan import ConanFile
-from conan.tools.cmake import CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 
 class BinanceDataCollectorConan(ConanFile):
     name = "binance-data-collector"
     version = "1.0.0"
     description = "Binance market data collection and aggregation service (WebSocket)."
+    settings = "os", "compiler", "build_type", "arch"
 
     def layout(self):
         cmake_layout(self)
@@ -19,3 +20,9 @@ class BinanceDataCollectorConan(ConanFile):
         tc.generate()
         deps = CMakeDeps(self)
         deps.generate()
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
