@@ -9,8 +9,9 @@ namespace Config {
 
 namespace {
 
-constexpr auto def_log_name = "bca_service.log";
-constexpr auto def_stats_name = "bca_statistics.log";
+constexpr auto def_log_name = "/var/log/binance-data-collector/bca_service.log";
+constexpr auto def_stats_name =
+	"/var/log/binance-data-collector/bca_statistics.log";
 constexpr std::size_t megabytes = 1024 * 1024;
 constexpr std::size_t def_max_log_size_mb = 10 * megabytes;
 constexpr std::size_t def_max_log_files_num = 4;
