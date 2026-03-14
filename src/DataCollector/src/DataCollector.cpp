@@ -220,11 +220,15 @@ void WebSocketClient::runClientSessionImpl(const std::string& host,
 bool WebSocketClient::putMsgToProcess(
     std::string& msg,
     std::optional<uint16_t>& put_index) noexcept {
-	if (!(put_index.has_value() || m_free_indices.pop(put_index.value()))) {
-		spdlog::critical("No free slot available in queue(impossible)");
-		return false;
+	if (!put_index.has_value()) {
+		uint16_t tmp_index;
+		if (!m_free_indices.pop(tmp_index)) {
+			spdlog::critical("No free slot available in queue(impossible)");
+			return false;
+		}
+		put_index = tmp_index;
 	}
-
+	spdlog::debug("Putting message to list index {}", put_index.value());
 	auto& msg_list = m_msg_list_arr[put_index.value()];
 	msg_list.emplace_back(std::move(msg));
 	if (msg_list.size() < m_cur_list_limit) {
