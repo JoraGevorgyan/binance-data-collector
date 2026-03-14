@@ -23,7 +23,7 @@ install(
 )
 
 install(
-	FILES ${CMAKE_SOURCE_DIR}/config.yaml
+	FILES ${CMAKE_SOURCE_DIR}/config.json
 	DESTINATION ${SERVICE_CONFIG_DIR}
 )
 
