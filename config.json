@@ -1,0 +1,19 @@
+{
+    "check-period-seconds": 10,
+    "connect-period-seconds": 60,
+    "host": "stream.binance.com",
+    "log-level": "info",
+    "max-log-files-num": 4,
+    "max-log-size-megabytes": 10,
+    "max-retries-num": 10,
+    "max-threads-num": 3,
+    "port": "9443",
+    "reconnection-delay-minutes": 1200,
+    "stats-flush-period-seconds": 40,
+    "stats-output-path": "statistics.log",
+    "streams": [
+        "btcusdt@trade",
+        "ethusdt@trade",
+        "bnbusdt@trade"
+    ]
+}
